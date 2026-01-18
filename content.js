@@ -6,8 +6,8 @@ function showLoadingPopup() {
   popup.id = 'amz-spending-popup';
   Object.assign(popup.style, {
     position: 'fixed',
-    bottom: '20px',
-    right: '20px',
+    bottom: '10px',
+    right: '10px',
     zIndex: '2147483647',
     backgroundColor: '#ffffff',
     color: '#0f1111',
@@ -15,7 +15,7 @@ function showLoadingPopup() {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    minWidth: '200px',
+    width: '220px',
     border: '1px solid #d5d9d9',
     userSelect: 'none',
   });
@@ -51,8 +51,8 @@ function injectPopup(data) {
   popup.id = 'amz-spending-popup';
   Object.assign(popup.style, {
     position: 'fixed',
-    bottom: '20px',
-    right: '20px',
+    bottom: '10px',
+    right: '10px',
     zIndex: '2147483647',
     backgroundColor: '#ffffff',
     color: '#0f1111',
@@ -60,7 +60,7 @@ function injectPopup(data) {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    minWidth: '200px',
+    width: '220px',
     border: '1px solid #d5d9d9',
     cursor: 'move',
     userSelect: 'none',
