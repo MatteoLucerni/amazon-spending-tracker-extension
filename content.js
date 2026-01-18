@@ -121,8 +121,10 @@ function injectPopup(data) {
 
       const rect = popup.getBoundingClientRect();
       const margin = 10;
-      const maxX = window.innerWidth - rect.width - margin;
-      const maxY = window.innerHeight - rect.height - margin;
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = document.documentElement.clientHeight;
+      const maxX = viewportWidth - rect.width - margin;
+      const maxY = viewportHeight - rect.height - margin;
 
       newX = Math.max(margin, Math.min(newX, maxX));
       newY = Math.max(margin, Math.min(newY, maxY));
