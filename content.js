@@ -1,5 +1,18 @@
 let cachedSpendingData = null;
 
+function savePopupState(isMinimized, position = null) {
+  const state = {
+    isMinimized,
+    position: position || JSON.parse(localStorage.getItem('amz-popup-state'))?.position || null
+  };
+  localStorage.setItem('amz-popup-state', JSON.stringify(state));
+}
+
+function getPopupState() {
+  const saved = localStorage.getItem('amz-popup-state');
+  return saved ? JSON.parse(saved) : { isMinimized: false, position: null };
+}
+
 function showMinimizedIcon() {
   const existing = document.getElementById('amz-spending-popup');
   if (existing) existing.remove();
@@ -36,6 +49,7 @@ function showMinimizedIcon() {
   };
 
   document.body.appendChild(icon);
+  savePopupState(true);
 }
 
 function showLoadingPopup() {
@@ -90,12 +104,12 @@ function injectPopup(data) {
   const existing = document.getElementById('amz-spending-popup');
   if (existing) existing.remove();
 
+  const savedState = getPopupState();
   const popup = document.createElement('div');
   popup.id = 'amz-spending-popup';
-  Object.assign(popup.style, {
+
+  const baseStyle = {
     position: 'fixed',
-    bottom: '10px',
-    right: '10px',
     zIndex: '2147483647',
     backgroundColor: '#ffffff',
     color: '#0f1111',
@@ -107,7 +121,17 @@ function injectPopup(data) {
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
-  });
+  };
+
+  if (savedState.position) {
+    baseStyle.left = savedState.position.left + 'px';
+    baseStyle.top = savedState.position.top + 'px';
+  } else {
+    baseStyle.bottom = '10px';
+    baseStyle.right = '10px';
+  }
+
+  Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
         <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:8px 10px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
@@ -130,6 +154,8 @@ function injectPopup(data) {
   document.body.appendChild(popup);
 
   document.getElementById('amz-close').onclick = () => showMinimizedIcon();
+
+  savePopupState(false);
 
   let isDragging = false;
   let offsetX = 0;
@@ -179,6 +205,8 @@ function injectPopup(data) {
 
   function dragEnd(e) {
     isDragging = false;
+    const rect = popup.getBoundingClientRect();
+    savePopupState(false, { left: rect.left, top: rect.top });
   }
 }
 
@@ -189,11 +217,20 @@ async function init() {
   )
     return;
 
-  showLoadingPopup();
+  const savedState = getPopupState();
+
+  if (!savedState.isMinimized) {
+    showLoadingPopup();
+  }
 
   chrome.runtime.sendMessage({ action: 'GET_SPENDING' }, response => {
     if (response && !response.error) {
-      injectPopup(response);
+      if (savedState.isMinimized) {
+        cachedSpendingData = response;
+        showMinimizedIcon();
+      } else {
+        injectPopup(response);
+      }
     } else if (response && response.error === 'AUTH_REQUIRED') {
       console.log('Tracker: Authentication required to fetch orders.');
     }
