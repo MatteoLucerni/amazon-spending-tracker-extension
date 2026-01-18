@@ -1,13 +1,9 @@
 const STORAGE_KEY = 'amz_spending_cache';
 const CACHE_TIME = 1000 * 60 * 30;
 
-const delay = ms => new Promise(res => setTimeout(res, ms));
-
 async function scrapeWithTab(filter) {
-  console.log(`[BG] Avvio scraping tab-based per: ${filter}`);
-
   const tab = await chrome.tabs.create({
-    url: `https://www.amazon.it/your-orders/orders?timeFilter=${filter}&language=it_IT`,
+    url: `https://www.amazon.it/your-orders/orders?timeFilter=${filter}`,
     active: false,
   });
 
@@ -49,14 +45,11 @@ async function scrapeWithTab(filter) {
             });
 
             const data = results[0].result;
-            console.log(`[BG] Risultato tab ${filter}:`, data);
-
             chrome.tabs.remove(tab.id);
 
             if (data.isBlocked) resolve(-1);
             else resolve(data.sum);
           } catch (err) {
-            console.error('[BG] Script injection failed:', err);
             chrome.tabs.remove(tab.id);
             resolve(0);
           }
@@ -73,17 +66,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (cached[STORAGE_KEY] && now - cached[STORAGE_KEY].ts < CACHE_TIME) {
         sendResponse(cached[STORAGE_KEY].data);
       } else {
-        const t30 = await scrapeWithTab('last30');
-        if (t30 === -1) {
+        const last30 = await scrapeWithTab('last30');
+        if (last30 === -1) {
           sendResponse({ error: 'AUTH_REQUIRED' });
           return;
         }
 
-        const currentYear = new Date().getFullYear();
-        const tYear = await scrapeWithTab(`year-${currentYear}`);
-        const tLast = await scrapeWithTab(`year-${currentYear - 1}`);
+        const months3 = await scrapeWithTab('months-3');
 
-        const data = { t30, tYear, tLast };
+        const data = { last30, months3 };
         await chrome.storage.local.set({ [STORAGE_KEY]: { data, ts: now } });
         sendResponse(data);
       }

@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "Amazon Spending Tracker PRO",
-    "version": "1.4",
+    "name": "Amazon Spending Tracker",
+    "version": "1.0.0",
     "permissions": [
         "storage",
         "tabs",
