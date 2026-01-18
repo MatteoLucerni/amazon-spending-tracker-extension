@@ -1,0 +1,27 @@
+{
+    "manifest_version": 3,
+    "name": "Amazon Spending Tracker PRO",
+    "version": "1.4",
+    "permissions": [
+        "storage",
+        "tabs",
+        "scripting"
+    ],
+    "host_permissions": [
+        "https://www.amazon.it/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.amazon.it/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_end"
+        }
+    ]
+}
