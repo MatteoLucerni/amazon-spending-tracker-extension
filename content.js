@@ -17,6 +17,7 @@ function showLoadingPopup() {
     fontFamily: 'Amazon Ember, Arial, sans-serif',
     width: '220px',
     border: '1px solid #d5d9d9',
+    boxSizing: 'border-box',
     userSelect: 'none',
   });
 
@@ -62,6 +63,7 @@ function injectPopup(data) {
     fontFamily: 'Amazon Ember, Arial, sans-serif',
     width: '220px',
     border: '1px solid #d5d9d9',
+    boxSizing: 'border-box',
     cursor: 'move',
     userSelect: 'none',
   });
