@@ -21,11 +21,21 @@ function showLoadingPopup() {
   });
 
   popup.innerHTML = `
+        <style>
+            @keyframes amz-spinner {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
         <div style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:8px 10px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center;">
             <span>Spending Tracker</span>
         </div>
         <div style="padding:10px; font-size:12px; color:#565959; line-height:1.4;">
-            <div style="margin-bottom:6px;">Loading spending data...</div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <div style="width:14px; height:14px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
+                <span>Loading spending data...</span>
+            </div>
+            <div style="font-size:11px; color:#767676; margin-bottom:4px;">Estimated time: ~5-10 seconds</div>
             <div style="font-size:11px; color:#767676;">Tabs may open automatically to fetch your orders.</div>
         </div>
     `;
