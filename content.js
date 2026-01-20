@@ -292,7 +292,7 @@ function injectPopup(data) {
                 </div>`
     : `<div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="color:#565959;">Last 3 months:</span>
-                    <b style="color:#B12704; font-size:14px;">${data.total3Months.toFixed(2)} €</b>
+                    <b style="color:#B12704; font-size:14px;">${Math.round(data.total3Months)} €</b>
                 </div>
                 <div style="font-size:11px; color:#767676;">${data.orderCount3Months} order${data.orderCount3Months !== 1 ? 's' : ''} ${warning3Months}</div>`;
 
@@ -311,7 +311,7 @@ function injectPopup(data) {
             <div>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="color:#565959;">Last 30 days:</span>
-                    <b style="color:#B12704; font-size:14px;">${data.total.toFixed(2)} €</b>
+                    <b style="color:#B12704; font-size:14px;">${Math.round(data.total)} €</b>
                 </div>
                 <div style="font-size:11px; color:#767676;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} ${warning30}</div>
             </div>
