@@ -90,8 +90,8 @@ function showLoadingPopup() {
                 <div style="width:14px; height:14px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
                 <span>Loading spending data...</span>
             </div>
-            <div style="font-size:11px; color:#767676; margin-bottom:4px;">Analyzing last week and last month...</div>
-            <div style="font-size:11px; color:#767676;">Tabs may open automatically to fetch your orders.</div>
+            <div style="font-size:11px; color:#767676; margin-bottom:4px;">Analyzing last 30 days...</div>
+            <div style="font-size:11px; color:#767676;">Tabs may open automatically (max 5 pages).</div>
         </div>
     `;
 
@@ -133,11 +133,8 @@ function injectPopup(data) {
 
   Object.assign(popup.style, baseStyle);
 
-  const warningWeek = data.lastWeekLimitReached
-    ? `<div style="font-size:10px; color:#ff9900; margin-top:4px;">⚠ Limite raggiunto: ${data.lastWeekOrders} ordini analizzati</div>`
-    : '';
-  const warningMonth = data.lastMonthLimitReached
-    ? `<div style="font-size:10px; color:#ff9900; margin-top:4px;">⚠ Limite raggiunto: ${data.lastMonthOrders} ordini analizzati</div>`
+  const warning = data.limitReached
+    ? `<div style="font-size:10px; color:#ff9900; margin-top:4px;">⚠ Limite raggiunto: ${data.orderCount} ordini analizzati (max 50)</div>`
     : '';
 
   popup.innerHTML = `
@@ -148,18 +145,11 @@ function injectPopup(data) {
         <div style="padding:10px; display:flex; flex-direction:column; gap:8px; font-size:12px;">
             <div>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:#565959;">Last week:</span>
-                    <b style="color:#B12704; font-size:13px;">EUR ${data.lastWeek.toFixed(2)}</b>
+                    <span style="color:#565959;">Last 30 days:</span>
+                    <b style="color:#B12704; font-size:16px;">EUR ${data.total.toFixed(2)}</b>
                 </div>
-                ${warningWeek}
-            </div>
-            <div style="height:1px; background:#e7e7e7; margin:2px 0;"></div>
-            <div>
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:#565959;">Last month:</span>
-                    <b style="color:#B12704; font-size:14px;">EUR ${data.lastMonth.toFixed(2)}</b>
-                </div>
-                ${warningMonth}
+                <div style="font-size:10px; color:#767676; margin-top:4px;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} analyzed</div>
+                ${warning}
             </div>
         </div>
     `;

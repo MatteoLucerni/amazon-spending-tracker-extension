@@ -128,21 +128,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } else {
         console.log('[Amazon Tracker] Cache expired or not found, fetching new data...');
 
-        const lastWeekResult = await scrapeWithTab('days-7');
-        if (lastWeekResult.sum === -1) {
+        const result = await scrapeWithTab('last30');
+        if (result.sum === -1) {
           sendResponse({ error: 'AUTH_REQUIRED' });
           return;
         }
 
-        const lastMonthResult = await scrapeWithTab('last30');
-
         const data = {
-          lastWeek: lastWeekResult.sum,
-          lastWeekOrders: lastWeekResult.orderCount,
-          lastWeekLimitReached: lastWeekResult.limitReached,
-          lastMonth: lastMonthResult.sum,
-          lastMonthOrders: lastMonthResult.orderCount,
-          lastMonthLimitReached: lastMonthResult.limitReached
+          total: result.sum,
+          orderCount: result.orderCount,
+          limitReached: result.limitReached
         };
         console.log('[Amazon Tracker] Saving to cache and sending response:', data);
         await chrome.storage.local.set({ [STORAGE_KEY]: { data, ts: now } });
