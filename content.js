@@ -166,7 +166,7 @@ function showLoadingPopup() {
             }
         </style>
         <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
-            <span>Amazon Spending Tracker</span>
+            <span>Spendings</span>
             <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
         </div>
         <div style="padding:8px; font-size:12px; color:#565959; line-height:1.3;">
@@ -304,7 +304,7 @@ function injectPopup(data) {
             }
         </style>
         <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
-            <span>Amazon Spending Tracker</span>
+            <span>Spendings</span>
             <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
         </div>
         <div style="padding:6px 8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
