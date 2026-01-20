@@ -41,29 +41,48 @@ function getCurrentPopupPosition() {
 // Apply position to a style object
 function applyPosition(styleObj, position) {
   if (position && typeof position.left === 'number' && typeof position.top === 'number') {
-    // Validate position is within viewport
-    const viewportWidth = document.documentElement.clientWidth;
-    const viewportHeight = document.documentElement.clientHeight;
-    const margin = 10;
-    const popupWidth = 200;
-    const popupHeight = 130;
-
-    let left = position.left;
-    let top = position.top;
-
-    // Ensure popup is visible
-    if (left < margin) left = margin;
-    if (top < margin) top = margin;
-    if (left > viewportWidth - popupWidth - margin) left = viewportWidth - popupWidth - margin;
-    if (top > viewportHeight - popupHeight - margin) top = viewportHeight - popupHeight - margin;
-
-    styleObj.left = left + 'px';
-    styleObj.top = top + 'px';
+    const constrained = constrainToViewport(position.left, position.top);
+    styleObj.left = constrained.left + 'px';
+    styleObj.top = constrained.top + 'px';
   } else {
     styleObj.bottom = '10px';
     styleObj.right = '10px';
   }
 }
+
+// Constrain position to viewport bounds
+function constrainToViewport(left, top) {
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+  const margin = 10;
+  const popupWidth = 200;
+  const popupHeight = 130;
+
+  if (left < margin) left = margin;
+  if (top < margin) top = margin;
+  if (left > viewportWidth - popupWidth - margin) left = viewportWidth - popupWidth - margin;
+  if (top > viewportHeight - popupHeight - margin) top = viewportHeight - popupHeight - margin;
+
+  return { left, top };
+}
+
+// Keep popup visible when viewport resizes
+function ensurePopupVisible() {
+  const popup = document.getElementById('amz-spending-popup');
+  if (!popup || popup.style.bottom) return; // Skip if using bottom/right positioning or no popup
+
+  const rect = popup.getBoundingClientRect();
+  const constrained = constrainToViewport(rect.left, rect.top);
+
+  if (constrained.left !== rect.left || constrained.top !== rect.top) {
+    popup.style.left = constrained.left + 'px';
+    popup.style.top = constrained.top + 'px';
+    savePopupState(false, constrained);
+  }
+}
+
+// Listen for viewport resize
+window.addEventListener('resize', ensurePopupVisible);
 
 function showMinimizedIcon() {
   // Save current position before removing the popup (for when it reopens)
@@ -145,17 +164,17 @@ function showLoadingPopup() {
                 100% { transform: rotate(360deg); }
             }
         </style>
-        <div id="amz-drag-handle" style="font-size:12px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
+        <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
             <span>Amazon Spending Tracker</span>
             <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
         </div>
-        <div style="padding:8px; font-size:11px; color:#565959; line-height:1.3;">
+        <div style="padding:8px; font-size:12px; color:#565959; line-height:1.3;">
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
                 <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
                 <span>Loading spending data...</span>
             </div>
-            <div style="font-size:10px; color:#767676; margin-bottom:2px;">Analyzing last 30 days...</div>
-            <div style="font-size:10px; color:#767676;">Tabs may open automatically (max 20 pages).</div>
+            <div style="font-size:11px; color:#767676; margin-bottom:2px;">Analyzing last 30 days...</div>
+            <div style="font-size:11px; color:#767676;">Tabs may open automatically (max 20 pages).</div>
         </div>
     `;
 
@@ -197,21 +216,12 @@ function setupDraggable(popup) {
       e.preventDefault();
       hasDragged = true;
 
-      let newX = e.clientX - offsetX;
-      let newY = e.clientY - offsetY;
+      const newX = e.clientX - offsetX;
+      const newY = e.clientY - offsetY;
+      const constrained = constrainToViewport(newX, newY);
 
-      const rect = popup.getBoundingClientRect();
-      const margin = 10;
-      const viewportWidth = document.documentElement.clientWidth;
-      const viewportHeight = document.documentElement.clientHeight;
-      const maxX = viewportWidth - rect.width - margin;
-      const maxY = viewportHeight - rect.height - margin;
-
-      newX = Math.max(margin, Math.min(newX, maxX));
-      newY = Math.max(margin, Math.min(newY, maxY));
-
-      popup.style.left = newX + 'px';
-      popup.style.top = newY + 'px';
+      popup.style.left = constrained.left + 'px';
+      popup.style.top = constrained.top + 'px';
     }
   };
 
@@ -266,24 +276,24 @@ function injectPopup(data) {
   Object.assign(popup.style, baseStyle);
 
   const warning30 = data.limitReached
-    ? `<div style="font-size:9px; color:#ff9900;">⚠ Max 20 pages</div>`
+    ? `<div style="font-size:10px; color:#ff9900;">⚠ Max 20 pages</div>`
     : '';
 
   const is3MonthsLoading = data.total3Months === undefined;
   const warning3Months = !is3MonthsLoading && data.limitReached3Months
-    ? `<div style="font-size:9px; color:#ff9900;">⚠ Max 20 pages</div>`
+    ? `<div style="font-size:10px; color:#ff9900;">⚠ Max 20 pages</div>`
     : '';
 
   const threeMonthsContent = is3MonthsLoading
     ? `<div style="display:flex; align-items:center; gap:6px;">
-                    <div style="width:10px; height:10px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
-                    <span style="color:#565959; font-size:10px;">Loading 3 months...</span>
+                    <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
+                    <span style="color:#565959;">Loading 3 months...</span>
                 </div>`
     : `<div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="color:#565959;">Last 3 months:</span>
-                    <b style="color:#B12704; font-size:14px;">EUR ${data.total3Months.toFixed(2)}</b>
+                    <b style="color:#B12704; font-size:16px;">EUR ${data.total3Months.toFixed(2)}</b>
                 </div>
-                <div style="font-size:9px; color:#767676;">${data.orderCount3Months} order${data.orderCount3Months !== 1 ? 's' : ''} ${warning3Months}</div>`;
+                <div style="font-size:10px; color:#767676;">${data.orderCount3Months} order${data.orderCount3Months !== 1 ? 's' : ''} ${warning3Months}</div>`;
 
   popup.innerHTML = `
         <style>
@@ -292,17 +302,17 @@ function injectPopup(data) {
                 100% { transform: rotate(360deg); }
             }
         </style>
-        <div id="amz-drag-handle" style="font-size:12px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
+        <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
             <span>Amazon Spending Tracker</span>
             <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
         </div>
-        <div style="padding:6px 8px; display:flex; flex-direction:column; gap:4px; font-size:11px;">
+        <div style="padding:6px 8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
             <div>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="color:#565959;">Last 30 days:</span>
-                    <b style="color:#B12704; font-size:14px;">EUR ${data.total.toFixed(2)}</b>
+                    <b style="color:#B12704; font-size:16px;">EUR ${data.total.toFixed(2)}</b>
                 </div>
-                <div style="font-size:9px; color:#767676;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} ${warning30}</div>
+                <div style="font-size:10px; color:#767676;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} ${warning30}</div>
             </div>
             <div style="border-top:1px solid #e7e7e7; padding-top:4px;">
                 ${threeMonthsContent}
