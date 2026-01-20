@@ -69,23 +69,21 @@ function constrainToViewport(left, top) {
   return { left, top };
 }
 
-// Keep popup visible when viewport resizes
-function ensurePopupVisible() {
+// Reset popup to bottom-right when viewport resizes
+function resetPopupPosition() {
   const popup = document.getElementById('amz-spending-popup');
-  if (!popup || popup.style.bottom) return; // Skip if using bottom/right positioning or no popup
+  if (!popup) return;
 
-  const rect = popup.getBoundingClientRect();
-  const constrained = constrainToViewport(rect.left, rect.top);
-
-  if (constrained.left !== rect.left || constrained.top !== rect.top) {
-    popup.style.left = constrained.left + 'px';
-    popup.style.top = constrained.top + 'px';
-    savePopupState(false, constrained);
-  }
+  // Reset to bottom-right
+  popup.style.left = '';
+  popup.style.top = '';
+  popup.style.bottom = '10px';
+  popup.style.right = '10px';
+  savePopupState(false, null);
 }
 
 // Listen for viewport resize
-window.addEventListener('resize', ensurePopupVisible);
+window.addEventListener('resize', resetPopupPosition);
 
 function showMinimizedIcon() {
   // Save current position before removing the popup (for when it reopens)
