@@ -23,6 +23,7 @@ async function scrapeSinglePage(filter, startIndex = 0) {
               target: { tabId: tab.id },
               func: () => {
                 let pageSum = 0;
+                let orderCount = 0;
                 const items = document.querySelectorAll(
                   '.order-header__header-list-item',
                 );
@@ -37,16 +38,17 @@ async function scrapeSinglePage(filter, startIndex = 0) {
                     } else if (clean.includes(',')) {
                       clean = clean.replace(',', '.');
                     }
-                    pageSum += parseFloat(clean) || 0;
+                    const amount = parseFloat(clean) || 0;
+                    if (amount > 0) {
+                      pageSum += amount;
+                      orderCount++;
+                    }
                   }
                 });
 
-                const orderCards = document.querySelectorAll('.order-card');
-                const hasOrders = orderCards.length > 0;
-
                 return {
                   sum: pageSum,
-                  hasOrders: hasOrders,
+                  orderCount: orderCount,
                   isBlocked:
                     document.body.innerText.includes('captcha') ||
                     document.querySelector('form[action*="signin"]') !== null,
@@ -60,7 +62,7 @@ async function scrapeSinglePage(filter, startIndex = 0) {
             resolve(data);
           } catch (err) {
             chrome.tabs.remove(tab.id);
-            resolve({ sum: 0, hasOrders: false, isBlocked: false });
+            resolve({ sum: 0, orderCount: 0, isBlocked: false });
           }
         }, 2000);
       }
@@ -72,6 +74,7 @@ async function scrapeWithTab(filter) {
   let totalSum = 0;
   let startIndex = 0;
   const maxPages = 50; // Limite di sicurezza per evitare loop infiniti
+  let totalOrders = 0;
 
   for (let page = 0; page < maxPages; page++) {
     const result = await scrapeSinglePage(filter, startIndex);
@@ -80,13 +83,27 @@ async function scrapeWithTab(filter) {
       return -1;
     }
 
-    if (!result.hasOrders) {
+    console.log(`[Amazon Tracker] ${filter} - Page ${page + 1}: ${result.orderCount} orders, €${result.sum.toFixed(2)}`);
+
+    // Se non ci sono ordini in questa pagina, abbiamo finito
+    if (result.orderCount === 0) {
+      console.log(`[Amazon Tracker] ${filter} - No more orders found, stopping.`);
       break;
     }
 
     totalSum += result.sum;
+    totalOrders += result.orderCount;
+
+    // Amazon mostra 10 ordini per pagina, se ne troviamo meno significa che è l'ultima pagina
+    if (result.orderCount < 10) {
+      console.log(`[Amazon Tracker] ${filter} - Found less than 10 orders, this is the last page.`);
+      break;
+    }
+
     startIndex += 10;
   }
+
+  console.log(`[Amazon Tracker] ${filter} TOTAL: ${totalOrders} orders, €${totalSum.toFixed(2)}`);
 
   return totalSum;
 }
