@@ -110,11 +110,16 @@ async function scrapeWithTab(filter) {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'GET_SPENDING') {
-    chrome.storage.local.get(STORAGE_KEY).then(async cached => {
+    (async () => {
+      const cached = await chrome.storage.local.get(STORAGE_KEY);
       const now = Date.now();
+
       if (cached[STORAGE_KEY] && now - cached[STORAGE_KEY].ts < CACHE_TIME) {
+        console.log('[Amazon Tracker] Using cached data');
         sendResponse(cached[STORAGE_KEY].data);
       } else {
+        console.log('[Amazon Tracker] Cache expired or not found, fetching new data...');
+
         const last30 = await scrapeWithTab('last30');
         if (last30 === -1) {
           sendResponse({ error: 'AUTH_REQUIRED' });
@@ -124,10 +129,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const months3 = await scrapeWithTab('months-3');
 
         const data = { last30, months3 };
+        console.log('[Amazon Tracker] Saving to cache and sending response:', data);
         await chrome.storage.local.set({ [STORAGE_KEY]: { data, ts: now } });
         sendResponse(data);
       }
-    });
+    })();
     return true;
   }
 });
