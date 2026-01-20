@@ -91,7 +91,7 @@ function showLoadingPopup() {
                 <span>Loading spending data...</span>
             </div>
             <div style="font-size:11px; color:#767676; margin-bottom:4px;">Analyzing last 30 days & 3 months...</div>
-            <div style="font-size:11px; color:#767676;">Tabs may open automatically (max 10 pages).</div>
+            <div style="font-size:11px; color:#767676;">Tabs may open automatically (max 40 pages).</div>
         </div>
     `;
 
@@ -134,11 +134,11 @@ function injectPopup(data) {
   Object.assign(popup.style, baseStyle);
 
   const warning30 = data.limitReached
-    ? `<div style="font-size:10px; color:#ff9900; margin-top:4px;">⚠ Limite raggiunto: ${data.orderCount} ordini analizzati (max 50)</div>`
+    ? `<div style="font-size:10px; color:#ff9900; margin-top:4px;">⚠ Limite raggiunto (max 20 pagine)</div>`
     : '';
 
   const warning3Months = data.limitReached3Months
-    ? `<div style="font-size:10px; color:#ff9900; margin-top:4px;">⚠ Limite raggiunto: ${data.orderCount3Months} ordini analizzati (max 50)</div>`
+    ? `<div style="font-size:10px; color:#ff9900; margin-top:4px;">⚠ Limite raggiunto (max 20 pagine)</div>`
     : '';
 
   popup.innerHTML = `

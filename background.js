@@ -73,7 +73,7 @@ async function scrapeSinglePage(filter, startIndex = 0) {
 async function scrapeWithTab(filter) {
   let totalSum = 0;
   let startIndex = 0;
-  const maxPages = 5; // Limite per evitare troppe tab
+  const maxPages = 20; // Limite per evitare troppe tab
   let totalOrders = 0;
   let limitReached = false;
 
