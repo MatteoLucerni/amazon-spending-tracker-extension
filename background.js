@@ -1,4 +1,5 @@
-const STORAGE_KEY = 'amz_spending_cache';
+const STORAGE_KEY_30 = 'amz_spending_cache_30';
+const STORAGE_KEY_3M = 'amz_spending_cache_3m';
 const CACHE_TIME = 1000 * 60 * 30;
 
 async function scrapeSinglePage(filter, startIndex = 0) {
@@ -117,41 +118,56 @@ async function scrapeWithTab(filter) {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'GET_SPENDING') {
+  if (request.action === 'GET_SPENDING_30') {
     (async () => {
-      const cached = await chrome.storage.local.get(STORAGE_KEY);
+      const cached = await chrome.storage.local.get(STORAGE_KEY_30);
       const now = Date.now();
 
-      if (cached[STORAGE_KEY] && now - cached[STORAGE_KEY].ts < CACHE_TIME) {
-        console.log('[Amazon Tracker] Using cached data');
-        sendResponse(cached[STORAGE_KEY].data);
+      if (cached[STORAGE_KEY_30] && now - cached[STORAGE_KEY_30].ts < CACHE_TIME) {
+        console.log('[Amazon Tracker] Using cached data for last 30 days');
+        sendResponse(cached[STORAGE_KEY_30].data);
       } else {
-        console.log('[Amazon Tracker] Cache expired or not found, fetching new data...');
-
-        // Scrape last 30 days
-        const result30 = await scrapeWithTab('last30');
-        if (result30.sum === -1) {
-          sendResponse({ error: 'AUTH_REQUIRED' });
-          return;
-        }
-
-        // Scrape last 3 months
-        const result3Months = await scrapeWithTab('months-3');
-        if (result3Months.sum === -1) {
+        console.log('[Amazon Tracker] Fetching last 30 days...');
+        const result = await scrapeWithTab('last30');
+        if (result.sum === -1) {
           sendResponse({ error: 'AUTH_REQUIRED' });
           return;
         }
 
         const data = {
-          total: result30.sum,
-          orderCount: result30.orderCount,
-          limitReached: result30.limitReached,
-          total3Months: result3Months.sum,
-          orderCount3Months: result3Months.orderCount,
-          limitReached3Months: result3Months.limitReached
+          total: result.sum,
+          orderCount: result.orderCount,
+          limitReached: result.limitReached
         };
-        console.log('[Amazon Tracker] Saving to cache and sending response:', data);
-        await chrome.storage.local.set({ [STORAGE_KEY]: { data, ts: now } });
+        await chrome.storage.local.set({ [STORAGE_KEY_30]: { data, ts: now } });
+        sendResponse(data);
+      }
+    })();
+    return true;
+  }
+
+  if (request.action === 'GET_SPENDING_3M') {
+    (async () => {
+      const cached = await chrome.storage.local.get(STORAGE_KEY_3M);
+      const now = Date.now();
+
+      if (cached[STORAGE_KEY_3M] && now - cached[STORAGE_KEY_3M].ts < CACHE_TIME) {
+        console.log('[Amazon Tracker] Using cached data for last 3 months');
+        sendResponse(cached[STORAGE_KEY_3M].data);
+      } else {
+        console.log('[Amazon Tracker] Fetching last 3 months...');
+        const result = await scrapeWithTab('months-3');
+        if (result.sum === -1) {
+          sendResponse({ error: 'AUTH_REQUIRED' });
+          return;
+        }
+
+        const data = {
+          total: result.sum,
+          orderCount: result.orderCount,
+          limitReached: result.limitReached
+        };
+        await chrome.storage.local.set({ [STORAGE_KEY_3M]: { data, ts: now } });
         sendResponse(data);
       }
     })();
