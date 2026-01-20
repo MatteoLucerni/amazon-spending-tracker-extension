@@ -45,15 +45,17 @@ function applyPosition(styleObj, position) {
     const viewportWidth = document.documentElement.clientWidth;
     const viewportHeight = document.documentElement.clientHeight;
     const margin = 10;
+    const popupWidth = 200;
+    const popupHeight = 130;
 
     let left = position.left;
     let top = position.top;
 
-    // Ensure popup is visible (at least partially)
+    // Ensure popup is visible
     if (left < margin) left = margin;
     if (top < margin) top = margin;
-    if (left > viewportWidth - 50) left = viewportWidth - 230; // 220px width + margin
-    if (top > viewportHeight - 50) top = viewportHeight - 100;
+    if (left > viewportWidth - popupWidth - margin) left = viewportWidth - popupWidth - margin;
+    if (top > viewportHeight - popupHeight - margin) top = viewportHeight - popupHeight - margin;
 
     styleObj.left = left + 'px';
     styleObj.top = top + 'px';
@@ -64,7 +66,7 @@ function applyPosition(styleObj, position) {
 }
 
 function showMinimizedIcon() {
-  // Save current position before removing the popup
+  // Save current position before removing the popup (for when it reopens)
   const currentPosition = getCurrentPopupPosition();
   if (currentPosition) {
     savePopupState(true, currentPosition);
@@ -73,32 +75,31 @@ function showMinimizedIcon() {
   const existing = document.getElementById('amz-spending-popup');
   if (existing) existing.remove();
 
-  const savedState = getPopupState();
   const icon = document.createElement('div');
   icon.id = 'amz-spending-popup';
 
-  const baseStyle = {
+  // Icon always goes to bottom-right corner
+  Object.assign(icon.style, {
     position: 'fixed',
+    bottom: '10px',
+    right: '10px',
     zIndex: '2147483647',
     backgroundColor: '#232f3e',
     color: '#ffffff',
-    width: '50px',
-    height: '50px',
+    width: '36px',
+    height: '36px',
     borderRadius: '50%',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    fontSize: '24px',
+    fontSize: '16px',
     fontWeight: 'bold',
     border: '2px solid #ffffff',
     boxSizing: 'border-box',
     userSelect: 'none',
-  };
-
-  applyPosition(baseStyle, savedState.position);
-  Object.assign(icon.style, baseStyle);
+  });
 
   icon.innerHTML = '$';
   icon.onclick = () => {
@@ -108,7 +109,6 @@ function showMinimizedIcon() {
   };
 
   document.body.appendChild(icon);
-  // Don't call savePopupState here - we already saved it above
 }
 
 function showLoadingPopup() {
@@ -128,7 +128,8 @@ function showLoadingPopup() {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '220px',
+    width: '200px',
+    height: '130px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
@@ -144,20 +145,88 @@ function showLoadingPopup() {
                 100% { transform: rotate(360deg); }
             }
         </style>
-        <div style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:8px 10px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center;">
+        <div id="amz-drag-handle" style="font-size:12px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
             <span>Amazon Spending Tracker</span>
+            <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
         </div>
-        <div style="padding:10px; font-size:12px; color:#565959; line-height:1.4;">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                <div style="width:14px; height:14px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
+        <div style="padding:8px; font-size:11px; color:#565959; line-height:1.3;">
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
                 <span>Loading spending data...</span>
             </div>
-            <div style="font-size:11px; color:#767676; margin-bottom:4px;">Analyzing last 30 days...</div>
-            <div style="font-size:11px; color:#767676;">Tabs may open automatically (max 20 pages).</div>
+            <div style="font-size:10px; color:#767676; margin-bottom:2px;">Analyzing last 30 days...</div>
+            <div style="font-size:10px; color:#767676;">Tabs may open automatically (max 20 pages).</div>
         </div>
     `;
 
   document.body.appendChild(popup);
+
+  document.getElementById('amz-close').onclick = () => showMinimizedIcon();
+
+  // Make loading popup draggable
+  setupDraggable(popup);
+}
+
+function setupDraggable(popup) {
+  let isDragging = false;
+  let hasDragged = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  const dragHandle = document.getElementById('amz-drag-handle');
+  if (!dragHandle) return;
+
+  const dragStart = (e) => {
+    if (e.target === dragHandle || dragHandle.contains(e.target)) {
+      if (e.target.id === 'amz-close') return; // Don't drag when clicking close
+      isDragging = true;
+      hasDragged = false;
+      const rect = popup.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+
+      popup.style.bottom = 'auto';
+      popup.style.right = 'auto';
+      popup.style.left = rect.left + 'px';
+      popup.style.top = rect.top + 'px';
+    }
+  };
+
+  const drag = (e) => {
+    if (isDragging) {
+      e.preventDefault();
+      hasDragged = true;
+
+      let newX = e.clientX - offsetX;
+      let newY = e.clientY - offsetY;
+
+      const rect = popup.getBoundingClientRect();
+      const margin = 10;
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = document.documentElement.clientHeight;
+      const maxX = viewportWidth - rect.width - margin;
+      const maxY = viewportHeight - rect.height - margin;
+
+      newX = Math.max(margin, Math.min(newX, maxX));
+      newY = Math.max(margin, Math.min(newY, maxY));
+
+      popup.style.left = newX + 'px';
+      popup.style.top = newY + 'px';
+    }
+  };
+
+  const dragEnd = () => {
+    if (isDragging && hasDragged) {
+      const rect = popup.getBoundingClientRect();
+      savePopupState(false, { left: rect.left, top: rect.top });
+    }
+    isDragging = false;
+    hasDragged = false;
+  };
+
+  dragHandle.addEventListener('mousedown', dragStart);
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', dragEnd);
 }
 
 function injectPopup(data) {
@@ -185,35 +254,36 @@ function injectPopup(data) {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '220px',
+    width: '200px',
+    height: '130px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
+    overflow: 'hidden',
   };
 
   applyPosition(baseStyle, savedState.position);
   Object.assign(popup.style, baseStyle);
 
   const warning30 = data.limitReached
-    ? `<div style="font-size:10px; color:#ff9900; margin-top:4px;">⚠ Limite raggiunto (max 20 pagine)</div>`
+    ? `<div style="font-size:9px; color:#ff9900;">⚠ Max 20 pages</div>`
     : '';
 
   const is3MonthsLoading = data.total3Months === undefined;
   const warning3Months = !is3MonthsLoading && data.limitReached3Months
-    ? `<div style="font-size:10px; color:#ff9900; margin-top:4px;">⚠ Limite raggiunto (max 20 pagine)</div>`
+    ? `<div style="font-size:9px; color:#ff9900;">⚠ Max 20 pages</div>`
     : '';
 
   const threeMonthsContent = is3MonthsLoading
-    ? `<div style="display:flex; align-items:center; gap:8px;">
-                    <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
-                    <span style="color:#565959;">Loading 3 months...</span>
+    ? `<div style="display:flex; align-items:center; gap:6px;">
+                    <div style="width:10px; height:10px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
+                    <span style="color:#565959; font-size:10px;">Loading 3 months...</span>
                 </div>`
     : `<div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="color:#565959;">Last 3 months:</span>
-                    <b style="color:#B12704; font-size:16px;">EUR ${data.total3Months.toFixed(2)}</b>
+                    <b style="color:#B12704; font-size:14px;">EUR ${data.total3Months.toFixed(2)}</b>
                 </div>
-                <div style="font-size:10px; color:#767676; margin-top:4px;">${data.orderCount3Months} order${data.orderCount3Months !== 1 ? 's' : ''} analyzed</div>
-                ${warning3Months}`;
+                <div style="font-size:9px; color:#767676;">${data.orderCount3Months} order${data.orderCount3Months !== 1 ? 's' : ''} ${warning3Months}</div>`;
 
   popup.innerHTML = `
         <style>
@@ -222,20 +292,19 @@ function injectPopup(data) {
                 100% { transform: rotate(360deg); }
             }
         </style>
-        <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:8px 10px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
+        <div id="amz-drag-handle" style="font-size:12px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
             <span>Amazon Spending Tracker</span>
-            <span id="amz-close" style="cursor:pointer; padding:0 5px; font-size:18px; line-height:1;">×</span>
+            <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
         </div>
-        <div style="padding:10px; display:flex; flex-direction:column; gap:8px; font-size:12px;">
+        <div style="padding:6px 8px; display:flex; flex-direction:column; gap:4px; font-size:11px;">
             <div>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="color:#565959;">Last 30 days:</span>
-                    <b style="color:#B12704; font-size:16px;">EUR ${data.total.toFixed(2)}</b>
+                    <b style="color:#B12704; font-size:14px;">EUR ${data.total.toFixed(2)}</b>
                 </div>
-                <div style="font-size:10px; color:#767676; margin-top:4px;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} analyzed</div>
-                ${warning30}
+                <div style="font-size:9px; color:#767676;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} ${warning30}</div>
             </div>
-            <div style="border-top:1px solid #e7e7e7; padding-top:8px;">
+            <div style="border-top:1px solid #e7e7e7; padding-top:4px;">
                 ${threeMonthsContent}
             </div>
         </div>
@@ -245,66 +314,8 @@ function injectPopup(data) {
 
   document.getElementById('amz-close').onclick = () => showMinimizedIcon();
 
-  // Note: We don't call savePopupState here anymore - position is saved on drag end or when minimizing
-
-  let isDragging = false;
-  let hasDragged = false; // Track if actual drag occurred
-  let offsetX = 0;
-  let offsetY = 0;
-
-  const dragHandle = document.getElementById('amz-drag-handle');
-
-  dragHandle.addEventListener('mousedown', dragStart);
-  document.addEventListener('mousemove', drag);
-  document.addEventListener('mouseup', dragEnd);
-
-  function dragStart(e) {
-    if (e.target === dragHandle || dragHandle.contains(e.target)) {
-      isDragging = true;
-      hasDragged = false; // Reset drag tracking
-      const rect = popup.getBoundingClientRect();
-      offsetX = e.clientX - rect.left;
-      offsetY = e.clientY - rect.top;
-
-      popup.style.bottom = 'auto';
-      popup.style.right = 'auto';
-      popup.style.left = rect.left + 'px';
-      popup.style.top = rect.top + 'px';
-    }
-  }
-
-  function drag(e) {
-    if (isDragging) {
-      e.preventDefault();
-      hasDragged = true; // Mark that actual dragging occurred
-
-      let newX = e.clientX - offsetX;
-      let newY = e.clientY - offsetY;
-
-      const rect = popup.getBoundingClientRect();
-      const margin = 10;
-      const viewportWidth = document.documentElement.clientWidth;
-      const viewportHeight = document.documentElement.clientHeight;
-      const maxX = viewportWidth - rect.width - margin;
-      const maxY = viewportHeight - rect.height - margin;
-
-      newX = Math.max(margin, Math.min(newX, maxX));
-      newY = Math.max(margin, Math.min(newY, maxY));
-
-      popup.style.left = newX + 'px';
-      popup.style.top = newY + 'px';
-    }
-  }
-
-  function dragEnd(e) {
-    if (isDragging && hasDragged) {
-      // Only save position if actual dragging occurred
-      const rect = popup.getBoundingClientRect();
-      savePopupState(false, { left: rect.left, top: rect.top });
-    }
-    isDragging = false;
-    hasDragged = false;
-  }
+  // Use shared draggable setup
+  setupDraggable(popup);
 }
 
 async function init() {
