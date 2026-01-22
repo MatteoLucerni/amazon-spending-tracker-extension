@@ -414,7 +414,8 @@ function injectPopup(data) {
   applyPosition(baseStyle, savedState.position, popupHeight);
   Object.assign(popup.style, baseStyle);
 
-  const warning30 = data.limitReached
+  const is30DaysLoading = data.total === undefined;
+  const warning30 = !is30DaysLoading && data.limitReached
     ? `<div style="font-size:10px; color:#ff9900;">⚠ Max 20 pages</div>`
     : '';
 
@@ -425,15 +426,21 @@ function injectPopup(data) {
       : '';
 
   // Build 30 days content
-  const thirtyDaysContent = settings.show30Days
-    ? `<div>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="color:#565959;">Last 30 days:</span>
-          <b style="color:#B12704; font-size:14px;">${Math.round(data.total)} €</b>
-        </div>
-        <div style="font-size:11px; color:#767676;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} ${warning30}</div>
-      </div>`
-    : '';
+  let thirtyDaysContent = '';
+  if (settings.show30Days) {
+    thirtyDaysContent = is30DaysLoading
+      ? `<div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
+          <span style="color:#565959;">Loading 30 days...</span>
+        </div>`
+      : `<div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#565959;">Last 30 days:</span>
+            <b style="color:#B12704; font-size:14px;">${Math.round(data.total)} €</b>
+          </div>
+          <div style="font-size:11px; color:#767676;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} ${warning30}</div>
+        </div>`;
+  }
 
   // Build 3 months content
   let threeMonthsContent = '';
@@ -494,22 +501,22 @@ function loadData(showLoading = true) {
 
   // If nothing is enabled, just show the popup with no data
   if (!settings.show30Days && !settings.show3Months) {
-    cachedSpendingData = {};
     if (savedState.isMinimized) {
       showMinimizedIcon();
     } else {
-      injectPopup(cachedSpendingData);
+      injectPopup({});
     }
     return;
-  }
-
-  if (showLoading && !savedState.isMinimized) {
-    showLoadingPopup();
   }
 
   // Determine what data we need to load
   const need30Days = settings.show30Days && cachedSpendingData?.total === undefined;
   const need3Months = settings.show3Months && cachedSpendingData?.total3Months === undefined;
+
+  // Check if we have any data to show already
+  const hasData30 = cachedSpendingData?.total !== undefined;
+  const hasData3M = cachedSpendingData?.total3Months !== undefined;
+  const hasAnyData = hasData30 || hasData3M;
 
   // If we already have all the data we need, just show it
   if (!need30Days && !need3Months) {
@@ -519,6 +526,16 @@ function loadData(showLoading = true) {
       injectPopup(cachedSpendingData);
     }
     return;
+  }
+
+  // Show loading only if we have no data at all, otherwise show current data with loader for missing part
+  if (showLoading && !savedState.isMinimized) {
+    if (hasAnyData) {
+      // Show existing data immediately - injectPopup handles showing loader for missing ranges
+      injectPopup(cachedSpendingData);
+    } else {
+      showLoadingPopup();
+    }
   }
 
   // Load 30 days if needed and enabled
@@ -532,10 +549,8 @@ function loadData(showLoading = true) {
           limitReached: response30.limitReached,
         };
 
-        // Show partial data or final if 3 months not needed
-        if (savedState.isMinimized) {
-          showMinimizedIcon();
-        } else {
+        // Update popup
+        if (!savedState.isMinimized) {
           injectPopup(cachedSpendingData);
         }
 
@@ -572,9 +587,7 @@ function loadData(showLoading = true) {
           limitReached3Months: response3M.limitReached,
         };
 
-        if (savedState.isMinimized) {
-          showMinimizedIcon();
-        } else {
+        if (!savedState.isMinimized) {
           injectPopup(cachedSpendingData);
         }
       } else if (response3M && response3M.error === 'AUTH_REQUIRED') {
