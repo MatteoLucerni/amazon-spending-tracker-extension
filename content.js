@@ -449,9 +449,12 @@ function injectPopup(data) {
   if (settings.show30Days) {
     const time30 = data.updatedAt30 ? formatRelativeTime(data.updatedAt30) : '';
     thirtyDaysContent = is30DaysLoading
-      ? `<div style="display:flex; align-items:center; gap:6px;">
-          <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
-          <span style="color:#565959;">Loading 30 days...</span>
+      ? `<div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
+            <span style="color:#565959;">Loading 30 days...</span>
+          </div>
+          <div style="font-size:10px; color:#999; margin-left:18px;">Tabs may auto-open</div>
         </div>`
       : `<div>
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -471,9 +474,12 @@ function injectPopup(data) {
     const time3M = data.updatedAt3M ? formatRelativeTime(data.updatedAt3M) : '';
     const separator = settings.show30Days ? 'border-top:1px solid #e7e7e7; padding-top:4px;' : '';
     const innerContent = is3MonthsLoading
-      ? `<div style="display:flex; align-items:center; gap:6px;">
-          <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
-          <span style="color:#565959;">Loading 3 months...</span>
+      ? `<div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
+            <span style="color:#565959;">Loading 3 months...</span>
+          </div>
+          <div style="font-size:10px; color:#999; margin-left:18px;">Tabs may auto-open</div>
         </div>`
       : `<div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="color:#565959;">Last 3 months:</span>
