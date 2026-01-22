@@ -48,26 +48,39 @@ function showSettingsView() {
     overflow: 'hidden',
   };
 
-  applyPosition(baseStyle, savedState.position);
+  applyPosition(baseStyle, savedState.position, 130);
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
+    <style>
+      .amz-toggle { position:relative; width:36px; height:20px; flex-shrink:0; }
+      .amz-toggle input { opacity:0; width:0; height:0; }
+      .amz-toggle .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.2s; border-radius:20px; }
+      .amz-toggle .slider:before { position:absolute; content:""; height:14px; width:14px; left:3px; bottom:3px; background-color:white; transition:.2s; border-radius:50%; }
+      .amz-toggle input:checked + .slider { background-color:#4caf50; }
+      .amz-toggle input:checked + .slider:before { transform:translateX(16px); }
+    </style>
     <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
       <span>Settings</span>
       <div style="display:flex; align-items:center; gap:4px;">
-        <span id="amz-back" style="cursor:pointer; padding:0 4px; font-size:14px; line-height:1;" title="Back">←</span>
-        <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
+        <svg id="amz-back" style="cursor:pointer; padding:0 2px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Back</title><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </div>
     </div>
-    <div style="padding:8px; font-size:12px;">
-      <div style="margin-bottom:8px; color:#565959; font-weight:600;">Show ranges:</div>
-      <label style="display:flex; align-items:center; gap:6px; margin-bottom:6px; cursor:pointer;">
-        <input type="checkbox" id="amz-setting-30days" ${settings.show30Days ? 'checked' : ''} style="margin:0; cursor:pointer;">
+    <div style="padding:10px 8px; font-size:12px; display:flex; flex-direction:column; gap:10px;">
+      <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
         <span>Last 30 days</span>
+        <div class="amz-toggle">
+          <input type="checkbox" id="amz-setting-30days" ${settings.show30Days ? 'checked' : ''}>
+          <span class="slider"></span>
+        </div>
       </label>
-      <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-        <input type="checkbox" id="amz-setting-3months" ${settings.show3Months ? 'checked' : ''} style="margin:0; cursor:pointer;">
+      <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
         <span>Last 3 months</span>
+        <div class="amz-toggle">
+          <input type="checkbox" id="amz-setting-3months" ${settings.show3Months ? 'checked' : ''}>
+          <span class="slider"></span>
+        </div>
       </label>
     </div>
   `;
@@ -148,13 +161,13 @@ function getCurrentPopupPosition() {
 }
 
 // Apply position to a style object
-function applyPosition(styleObj, position) {
+function applyPosition(styleObj, position, height = null) {
   if (
     position &&
     typeof position.left === 'number' &&
     typeof position.top === 'number'
   ) {
-    const constrained = constrainToViewport(position.left, position.top);
+    const constrained = constrainToViewport(position.left, position.top, height);
     styleObj.left = constrained.left + 'px';
     styleObj.top = constrained.top + 'px';
   } else {
@@ -164,12 +177,17 @@ function applyPosition(styleObj, position) {
 }
 
 // Constrain position to viewport bounds
-function constrainToViewport(left, top) {
+function constrainToViewport(left, top, height = null) {
   const viewportWidth = document.documentElement.clientWidth;
   const viewportHeight = document.documentElement.clientHeight;
   const margin = 10;
   const popupWidth = 160;
-  const popupHeight = 130;
+  // Use actual popup height if available, otherwise get from DOM or use default
+  let popupHeight = height;
+  if (!popupHeight) {
+    const popup = document.getElementById('amz-spending-popup');
+    popupHeight = popup ? popup.offsetHeight : 130;
+  }
 
   // Calculate max positions, ensuring they don't go below margin even if viewport is small
   const maxLeft = Math.max(margin, viewportWidth - popupWidth - margin);
@@ -268,7 +286,7 @@ function showLoadingPopup() {
     userSelect: 'none',
   };
 
-  applyPosition(baseStyle, savedState.position);
+  applyPosition(baseStyle, savedState.position, 130);
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
@@ -281,8 +299,8 @@ function showLoadingPopup() {
         <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
             <span>Spendings</span>
             <div style="display:flex; align-items:center; gap:4px;">
-                <span id="amz-settings" style="cursor:pointer; padding:0 4px; font-size:14px; line-height:1;" title="Settings">⚙</span>
-                <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
+                <svg id="amz-settings" style="cursor:pointer; padding:0 2px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Settings</title><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </div>
         </div>
         <div style="padding:8px; font-size:12px; color:#565959; line-height:1.3;">
@@ -394,7 +412,7 @@ function injectPopup(data) {
     overflow: 'hidden',
   };
 
-  applyPosition(baseStyle, savedState.position);
+  applyPosition(baseStyle, savedState.position, popupHeight);
   Object.assign(popup.style, baseStyle);
 
   const warning30 = data.limitReached
@@ -450,8 +468,8 @@ function injectPopup(data) {
         <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
             <span>Spendings</span>
             <div style="display:flex; align-items:center; gap:4px;">
-                <span id="amz-settings" style="cursor:pointer; padding:0 4px; font-size:14px; line-height:1;" title="Settings">⚙</span>
-                <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
+                <svg id="amz-settings" style="cursor:pointer; padding:0 2px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Settings</title><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </div>
         </div>
         <div style="padding:6px 8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
