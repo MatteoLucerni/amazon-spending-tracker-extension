@@ -1,4 +1,4 @@
-let cachedSpendingData = null;
+let cachedSpendingData = {};
 
 // Settings management
 function getSettings() {
@@ -15,6 +15,22 @@ function getSettings() {
 
 function saveSettings(settings) {
   localStorage.setItem('amz-spending-settings', JSON.stringify(settings));
+}
+
+// Format timestamp as relative time (e.g., "5 min ago", "2 hours ago")
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return '';
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
 function showSettingsView() {
@@ -48,26 +64,39 @@ function showSettingsView() {
     overflow: 'hidden',
   };
 
-  applyPosition(baseStyle, savedState.position);
+  applyPosition(baseStyle, savedState.position, 130);
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
+    <style>
+      .amz-toggle { position:relative; width:28px; height:16px; flex-shrink:0; }
+      .amz-toggle input { opacity:0; width:0; height:0; }
+      .amz-toggle .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.2s; border-radius:16px; }
+      .amz-toggle .slider:before { position:absolute; content:""; height:12px; width:12px; left:2px; bottom:2px; background-color:white; transition:.2s; border-radius:50%; }
+      .amz-toggle input:checked + .slider { background-color:#4caf50; }
+      .amz-toggle input:checked + .slider:before { transform:translateX(12px); }
+    </style>
     <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
       <span>Settings</span>
       <div style="display:flex; align-items:center; gap:4px;">
-        <span id="amz-back" style="cursor:pointer; padding:0 4px; font-size:14px; line-height:1;" title="Back">←</span>
-        <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
+        <svg id="amz-back" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Back</title><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </div>
     </div>
-    <div style="padding:8px; font-size:12px;">
-      <div style="margin-bottom:8px; color:#565959; font-weight:600;">Show ranges:</div>
-      <label style="display:flex; align-items:center; gap:6px; margin-bottom:6px; cursor:pointer;">
-        <input type="checkbox" id="amz-setting-30days" ${settings.show30Days ? 'checked' : ''} style="margin:0; cursor:pointer;">
+    <div style="padding:10px 8px; font-size:12px; display:flex; flex-direction:column; gap:10px;">
+      <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
         <span>Last 30 days</span>
+        <div class="amz-toggle">
+          <input type="checkbox" id="amz-setting-30days" ${settings.show30Days ? 'checked' : ''}>
+          <span class="slider"></span>
+        </div>
       </label>
-      <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-        <input type="checkbox" id="amz-setting-3months" ${settings.show3Months ? 'checked' : ''} style="margin:0; cursor:pointer;">
+      <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
         <span>Last 3 months</span>
+        <div class="amz-toggle">
+          <input type="checkbox" id="amz-setting-3months" ${settings.show3Months ? 'checked' : ''}>
+          <span class="slider"></span>
+        </div>
       </label>
     </div>
   `;
@@ -82,9 +111,8 @@ function showSettingsView() {
       show3Months: document.getElementById('amz-setting-3months').checked,
     };
     saveSettings(newSettings);
-    if (cachedSpendingData) {
-      injectPopup(cachedSpendingData);
-    }
+    // Load data (will fetch missing ranges if newly enabled)
+    loadData(true);
   };
 
   // Auto-save on checkbox change
@@ -148,13 +176,13 @@ function getCurrentPopupPosition() {
 }
 
 // Apply position to a style object
-function applyPosition(styleObj, position) {
+function applyPosition(styleObj, position, height = null) {
   if (
     position &&
     typeof position.left === 'number' &&
     typeof position.top === 'number'
   ) {
-    const constrained = constrainToViewport(position.left, position.top);
+    const constrained = constrainToViewport(position.left, position.top, height);
     styleObj.left = constrained.left + 'px';
     styleObj.top = constrained.top + 'px';
   } else {
@@ -164,12 +192,17 @@ function applyPosition(styleObj, position) {
 }
 
 // Constrain position to viewport bounds
-function constrainToViewport(left, top) {
+function constrainToViewport(left, top, height = null) {
   const viewportWidth = document.documentElement.clientWidth;
   const viewportHeight = document.documentElement.clientHeight;
   const margin = 10;
   const popupWidth = 160;
-  const popupHeight = 130;
+  // Use actual popup height if available, otherwise get from DOM or use default
+  let popupHeight = height;
+  if (!popupHeight) {
+    const popup = document.getElementById('amz-spending-popup');
+    popupHeight = popup ? popup.offsetHeight : 130;
+  }
 
   // Calculate max positions, ensuring they don't go below margin even if viewport is small
   const maxLeft = Math.max(margin, viewportWidth - popupWidth - margin);
@@ -268,7 +301,7 @@ function showLoadingPopup() {
     userSelect: 'none',
   };
 
-  applyPosition(baseStyle, savedState.position);
+  applyPosition(baseStyle, savedState.position, 130);
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
@@ -281,8 +314,8 @@ function showLoadingPopup() {
         <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
             <span>Spendings</span>
             <div style="display:flex; align-items:center; gap:4px;">
-                <span id="amz-settings" style="cursor:pointer; padding:0 4px; font-size:14px; line-height:1;" title="Settings">⚙</span>
-                <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
+                <svg id="amz-settings" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Settings</title><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </div>
         </div>
         <div style="padding:8px; font-size:12px; color:#565959; line-height:1.3;">
@@ -394,10 +427,11 @@ function injectPopup(data) {
     overflow: 'hidden',
   };
 
-  applyPosition(baseStyle, savedState.position);
+  applyPosition(baseStyle, savedState.position, popupHeight);
   Object.assign(popup.style, baseStyle);
 
-  const warning30 = data.limitReached
+  const is30DaysLoading = data.total === undefined;
+  const warning30 = !is30DaysLoading && data.limitReached
     ? `<div style="font-size:10px; color:#ff9900;">⚠ Max 20 pages</div>`
     : '';
 
@@ -407,31 +441,54 @@ function injectPopup(data) {
       ? `<div style="font-size:10px; color:#ff9900;">⚠ Max 20 pages</div>`
       : '';
 
+  // Refresh icon SVG
+  const refreshIcon = `<svg style="cursor:pointer; flex-shrink:0;" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#767676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Refresh</title><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+
   // Build 30 days content
-  const thirtyDaysContent = settings.show30Days
-    ? `<div>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="color:#565959;">Last 30 days:</span>
-          <b style="color:#B12704; font-size:14px;">${Math.round(data.total)} €</b>
-        </div>
-        <div style="font-size:11px; color:#767676;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} ${warning30}</div>
-      </div>`
-    : '';
+  let thirtyDaysContent = '';
+  if (settings.show30Days) {
+    const time30 = data.updatedAt30 ? formatRelativeTime(data.updatedAt30) : '';
+    thirtyDaysContent = is30DaysLoading
+      ? `<div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
+            <span style="color:#565959;">Loading 30 days...</span>
+          </div>
+          <div style="font-size:10px; color:#999; margin-left:18px;">Tabs may auto-open</div>
+        </div>`
+      : `<div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#565959;">Last 30 days:</span>
+            <b style="color:#B12704; font-size:14px;">${Math.round(data.total)} €</b>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; color:#767676;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''}${time30 ? ` · ${time30}` : ''} ${warning30}</span>
+            <span id="amz-refresh-30">${refreshIcon}</span>
+          </div>
+        </div>`;
+  }
 
   // Build 3 months content
   let threeMonthsContent = '';
   if (settings.show3Months) {
+    const time3M = data.updatedAt3M ? formatRelativeTime(data.updatedAt3M) : '';
     const separator = settings.show30Days ? 'border-top:1px solid #e7e7e7; padding-top:4px;' : '';
     const innerContent = is3MonthsLoading
-      ? `<div style="display:flex; align-items:center; gap:6px;">
-          <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
-          <span style="color:#565959;">Loading 3 months...</span>
+      ? `<div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
+            <span style="color:#565959;">Loading 3 months...</span>
+          </div>
+          <div style="font-size:10px; color:#999; margin-left:18px;">Tabs may auto-open</div>
         </div>`
       : `<div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="color:#565959;">Last 3 months:</span>
           <b style="color:#B12704; font-size:14px;">${Math.round(data.total3Months)} €</b>
         </div>
-        <div style="font-size:11px; color:#767676;">${data.orderCount3Months} order${data.orderCount3Months !== 1 ? 's' : ''} ${warning3Months}</div>`;
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:11px; color:#767676;">${data.orderCount3Months} order${data.orderCount3Months !== 1 ? 's' : ''}${time3M ? ` · ${time3M}` : ''} ${warning3Months}</span>
+          <span id="amz-refresh-3m">${refreshIcon}</span>
+        </div>`;
     threeMonthsContent = `<div style="${separator}">${innerContent}</div>`;
   }
 
@@ -450,8 +507,9 @@ function injectPopup(data) {
         <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
             <span>Spendings</span>
             <div style="display:flex; align-items:center; gap:4px;">
-                <span id="amz-settings" style="cursor:pointer; padding:0 4px; font-size:14px; line-height:1;" title="Settings">⚙</span>
-                <span id="amz-close" style="cursor:pointer; padding:0 4px; font-size:16px; line-height:1;">×</span>
+                <svg id="amz-refresh-all" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Refresh all</title><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <svg id="amz-settings" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Settings</title><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </div>
         </div>
         <div style="padding:6px 8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
@@ -465,9 +523,226 @@ function injectPopup(data) {
 
   document.getElementById('amz-close').onclick = () => showMinimizedIcon();
   document.getElementById('amz-settings').onclick = () => showSettingsView();
+  document.getElementById('amz-refresh-all').onclick = () => refreshAll();
+
+  // Refresh handlers
+  const refresh30Btn = document.getElementById('amz-refresh-30');
+  if (refresh30Btn) {
+    refresh30Btn.onclick = () => refreshRange('30');
+  }
+  const refresh3mBtn = document.getElementById('amz-refresh-3m');
+  if (refresh3mBtn) {
+    refresh3mBtn.onclick = () => refreshRange('3m');
+  }
 
   // Use shared draggable setup
   setupDraggable(popup);
+}
+
+// Force refresh a specific range
+function refreshRange(range) {
+  if (range === '30') {
+    // Clear cached 30 days data and show loading state
+    delete cachedSpendingData.total;
+    delete cachedSpendingData.orderCount;
+    delete cachedSpendingData.limitReached;
+    delete cachedSpendingData.updatedAt30;
+    injectPopup(cachedSpendingData);
+
+    chrome.runtime.sendMessage({ action: 'GET_SPENDING_30', force: true }, response => {
+      if (response && !response.error) {
+        cachedSpendingData = {
+          ...cachedSpendingData,
+          total: response.total,
+          orderCount: response.orderCount,
+          limitReached: response.limitReached,
+          updatedAt30: response.updatedAt,
+        };
+        injectPopup(cachedSpendingData);
+      }
+    });
+  } else if (range === '3m') {
+    // Clear cached 3 months data and show loading state
+    delete cachedSpendingData.total3Months;
+    delete cachedSpendingData.orderCount3Months;
+    delete cachedSpendingData.limitReached3Months;
+    delete cachedSpendingData.updatedAt3M;
+    injectPopup(cachedSpendingData);
+
+    chrome.runtime.sendMessage({ action: 'GET_SPENDING_3M', force: true }, response => {
+      if (response && !response.error) {
+        cachedSpendingData = {
+          ...cachedSpendingData,
+          total3Months: response.total,
+          orderCount3Months: response.orderCount,
+          limitReached3Months: response.limitReached,
+          updatedAt3M: response.updatedAt,
+        };
+        injectPopup(cachedSpendingData);
+      }
+    });
+  }
+}
+
+// Force refresh all enabled ranges
+function refreshAll() {
+  const settings = getSettings();
+
+  // Clear all cached data and show loading state
+  cachedSpendingData = {};
+  injectPopup(cachedSpendingData);
+
+  // Load 30 days if enabled
+  if (settings.show30Days) {
+    chrome.runtime.sendMessage({ action: 'GET_SPENDING_30', force: true }, response30 => {
+      if (response30 && !response30.error) {
+        cachedSpendingData = {
+          ...cachedSpendingData,
+          total: response30.total,
+          orderCount: response30.orderCount,
+          limitReached: response30.limitReached,
+          updatedAt30: response30.updatedAt,
+        };
+        injectPopup(cachedSpendingData);
+
+        // Load 3 months if enabled
+        if (settings.show3Months) {
+          chrome.runtime.sendMessage({ action: 'GET_SPENDING_3M', force: true }, response3M => {
+            if (response3M && !response3M.error) {
+              cachedSpendingData = {
+                ...cachedSpendingData,
+                total3Months: response3M.total,
+                orderCount3Months: response3M.orderCount,
+                limitReached3Months: response3M.limitReached,
+                updatedAt3M: response3M.updatedAt,
+              };
+              injectPopup(cachedSpendingData);
+            }
+          });
+        }
+      }
+    });
+  } else if (settings.show3Months) {
+    // Only 3 months enabled
+    chrome.runtime.sendMessage({ action: 'GET_SPENDING_3M', force: true }, response3M => {
+      if (response3M && !response3M.error) {
+        cachedSpendingData = {
+          ...cachedSpendingData,
+          total3Months: response3M.total,
+          orderCount3Months: response3M.orderCount,
+          limitReached3Months: response3M.limitReached,
+          updatedAt3M: response3M.updatedAt,
+        };
+        injectPopup(cachedSpendingData);
+      }
+    });
+  }
+}
+
+// Load data based on current settings, only fetching what's needed
+function loadData(showLoading = true) {
+  const settings = getSettings();
+  const savedState = getPopupState();
+
+  // If nothing is enabled, just show the popup with no data
+  if (!settings.show30Days && !settings.show3Months) {
+    if (savedState.isMinimized) {
+      showMinimizedIcon();
+    } else {
+      injectPopup({});
+    }
+    return;
+  }
+
+  // Determine what data we need to load
+  const need30Days = settings.show30Days && cachedSpendingData?.total === undefined;
+  const need3Months = settings.show3Months && cachedSpendingData?.total3Months === undefined;
+
+  // Check if we have any data to show already
+  const hasData30 = cachedSpendingData?.total !== undefined;
+  const hasData3M = cachedSpendingData?.total3Months !== undefined;
+  const hasAnyData = hasData30 || hasData3M;
+
+  // If we already have all the data we need, just show it
+  if (!need30Days && !need3Months) {
+    if (savedState.isMinimized) {
+      showMinimizedIcon();
+    } else {
+      injectPopup(cachedSpendingData);
+    }
+    return;
+  }
+
+  // Show loading only if we have no data at all, otherwise show current data with loader for missing part
+  if (showLoading && !savedState.isMinimized) {
+    if (hasAnyData) {
+      // Show existing data immediately - injectPopup handles showing loader for missing ranges
+      injectPopup(cachedSpendingData);
+    } else {
+      showLoadingPopup();
+    }
+  }
+
+  // Load 30 days if needed and enabled
+  if (need30Days) {
+    chrome.runtime.sendMessage({ action: 'GET_SPENDING_30' }, response30 => {
+      if (response30 && !response30.error) {
+        cachedSpendingData = {
+          ...cachedSpendingData,
+          total: response30.total,
+          orderCount: response30.orderCount,
+          limitReached: response30.limitReached,
+          updatedAt30: response30.updatedAt,
+        };
+
+        // Update popup
+        if (!savedState.isMinimized) {
+          injectPopup(cachedSpendingData);
+        }
+
+        // Load 3 months if needed
+        if (need3Months) {
+          chrome.runtime.sendMessage({ action: 'GET_SPENDING_3M' }, response3M => {
+            if (response3M && !response3M.error) {
+              cachedSpendingData = {
+                ...cachedSpendingData,
+                total3Months: response3M.total,
+                orderCount3Months: response3M.orderCount,
+                limitReached3Months: response3M.limitReached,
+                updatedAt3M: response3M.updatedAt,
+              };
+
+              const currentPopup = document.getElementById('amz-spending-popup');
+              if (currentPopup && currentPopup.querySelector('#amz-drag-handle')) {
+                injectPopup(cachedSpendingData);
+              }
+            }
+          });
+        }
+      } else if (response30 && response30.error === 'AUTH_REQUIRED') {
+        console.log('Tracker: Authentication required to fetch orders.');
+      }
+    });
+  } else if (need3Months) {
+    // Only need 3 months (30 days already cached or disabled)
+    chrome.runtime.sendMessage({ action: 'GET_SPENDING_3M' }, response3M => {
+      if (response3M && !response3M.error) {
+        cachedSpendingData = {
+          ...cachedSpendingData,
+          total3Months: response3M.total,
+          orderCount3Months: response3M.orderCount,
+          limitReached3Months: response3M.limitReached,
+          updatedAt3M: response3M.updatedAt,
+        };
+
+        if (!savedState.isMinimized) {
+          injectPopup(cachedSpendingData);
+        }
+      } else if (response3M && response3M.error === 'AUTH_REQUIRED') {
+        console.log('Tracker: Authentication required to fetch orders.');
+      }
+    });
+  }
 }
 
 async function init() {
@@ -480,54 +755,7 @@ async function init() {
   )
     return;
 
-  const savedState = getPopupState();
-
-  if (!savedState.isMinimized) {
-    showLoadingPopup();
-  }
-
-  // First load: 30 days
-  chrome.runtime.sendMessage({ action: 'GET_SPENDING_30' }, response30 => {
-    if (response30 && !response30.error) {
-      const partialData = {
-        total: response30.total,
-        orderCount: response30.orderCount,
-        limitReached: response30.limitReached,
-        // total3Months is undefined, will show loader
-      };
-
-      if (savedState.isMinimized) {
-        cachedSpendingData = partialData;
-        showMinimizedIcon();
-      } else {
-        injectPopup(partialData);
-      }
-
-      // Second load: 3 months
-      chrome.runtime.sendMessage({ action: 'GET_SPENDING_3M' }, response3M => {
-        if (response3M && !response3M.error) {
-          const fullData = {
-            total: response30.total,
-            orderCount: response30.orderCount,
-            limitReached: response30.limitReached,
-            total3Months: response3M.total,
-            orderCount3Months: response3M.orderCount,
-            limitReached3Months: response3M.limitReached,
-          };
-
-          cachedSpendingData = fullData;
-
-          // Update popup if not minimized
-          const currentPopup = document.getElementById('amz-spending-popup');
-          if (currentPopup && currentPopup.querySelector('#amz-drag-handle')) {
-            injectPopup(fullData);
-          }
-        }
-      });
-    } else if (response30 && response30.error === 'AUTH_REQUIRED') {
-      console.log('Tracker: Authentication required to fetch orders.');
-    }
-  });
+  loadData(true);
 }
 
 init();

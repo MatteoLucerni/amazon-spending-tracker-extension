@@ -123,9 +123,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const cached = await chrome.storage.local.get(STORAGE_KEY_30);
       const now = Date.now();
 
-      if (cached[STORAGE_KEY_30] && now - cached[STORAGE_KEY_30].ts < CACHE_TIME) {
+      if (!request.force && cached[STORAGE_KEY_30] && now - cached[STORAGE_KEY_30].ts < CACHE_TIME) {
         console.log('[Amazon Tracker] Using cached data for last 30 days');
-        sendResponse(cached[STORAGE_KEY_30].data);
+        sendResponse({ ...cached[STORAGE_KEY_30].data, updatedAt: cached[STORAGE_KEY_30].ts });
       } else {
         console.log('[Amazon Tracker] Fetching last 30 days...');
         const result = await scrapeWithTab('last30');
@@ -140,7 +140,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           limitReached: result.limitReached
         };
         await chrome.storage.local.set({ [STORAGE_KEY_30]: { data, ts: now } });
-        sendResponse(data);
+        sendResponse({ ...data, updatedAt: now });
       }
     })();
     return true;
@@ -151,9 +151,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const cached = await chrome.storage.local.get(STORAGE_KEY_3M);
       const now = Date.now();
 
-      if (cached[STORAGE_KEY_3M] && now - cached[STORAGE_KEY_3M].ts < CACHE_TIME) {
+      if (!request.force && cached[STORAGE_KEY_3M] && now - cached[STORAGE_KEY_3M].ts < CACHE_TIME) {
         console.log('[Amazon Tracker] Using cached data for last 3 months');
-        sendResponse(cached[STORAGE_KEY_3M].data);
+        sendResponse({ ...cached[STORAGE_KEY_3M].data, updatedAt: cached[STORAGE_KEY_3M].ts });
       } else {
         console.log('[Amazon Tracker] Fetching last 3 months...');
         const result = await scrapeWithTab('months-3');
@@ -168,7 +168,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           limitReached: result.limitReached
         };
         await chrome.storage.local.set({ [STORAGE_KEY_3M]: { data, ts: now } });
-        sendResponse(data);
+        sendResponse({ ...data, updatedAt: now });
       }
     })();
     return true;
