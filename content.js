@@ -917,23 +917,33 @@ function injectCheckoutAlert(spendingAmount, rangeLabel) {
 
 // Handle checkout page - show spending alert
 function handleCheckoutPage() {
-  // First try to get cached data from storage (cacheOnly: don't trigger scraping)
-  safeSendMessage({ action: 'GET_SPENDING_30', cacheOnly: true }, response30 => {
-    if (response30 && !response30.error && !response30.noCache && response30.total !== undefined && response30.total > 0) {
-      // We have 30 days data with spending
-      injectCheckoutAlert(response30.total, 'This month');
-      return;
-    }
+  const settings = getSettings();
 
-    // No 30 days data or zero spending, try 3 months
+  // Helper to try 3 months data
+  const tryThreeMonths = () => {
+    if (!settings.show3Months) return;
+
     safeSendMessage({ action: 'GET_SPENDING_3M', cacheOnly: true }, response3M => {
       if (response3M && !response3M.error && !response3M.noCache && response3M.total !== undefined && response3M.total > 0) {
-        // We have 3 months data with spending
         injectCheckoutAlert(response3M.total, 'In the last 3 months');
       }
-      // If no data or zero spending, don't show anything
     });
-  });
+  };
+
+  // First try 30 days if enabled in settings
+  if (settings.show30Days) {
+    safeSendMessage({ action: 'GET_SPENDING_30', cacheOnly: true }, response30 => {
+      if (response30 && !response30.error && !response30.noCache && response30.total !== undefined && response30.total > 0) {
+        injectCheckoutAlert(response30.total, 'This month');
+        return;
+      }
+      // No 30 days data, try 3 months as fallback
+      tryThreeMonths();
+    });
+  } else {
+    // 30 days disabled, try 3 months directly
+    tryThreeMonths();
+  }
 }
 
 // Observe DOM changes to inject alert when subtotals appears
