@@ -17,6 +17,10 @@ function safeSendMessage(message, callback) {
           showErrorPopup('CONTEXT_INVALIDATED');
           return;
         }
+        // Ignore "message channel closed" - common in MV3 when service worker sleeps
+        if (errorMessage.includes('message channel closed')) {
+          return;
+        }
         console.error('[Amazon Tracker] sendMessage error:', errorMessage);
       }
       if (callback) callback(response);
