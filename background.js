@@ -3,23 +3,31 @@ const STORAGE_KEY_3M = 'amz_spending_cache_3m';
 const CACHE_TIME = 1000 * 60 * 60 * 24; // 1 day
 
 async function createTabWithRetry(url, maxRetries = 3) {
+  let lastError = null;
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const tab = await chrome.tabs.create({
-        url: url,
-        active: false,
-      });
-      return tab;
-    } catch (err) {
-      console.log(`[Amazon Tracker] Tab creation attempt ${attempt + 1} failed: ${err.message}`);
-      if (attempt < maxRetries - 1) {
-        // Wait before retrying (exponential backoff: 500ms, 1000ms, 2000ms)
-        await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt)));
-      } else {
-        throw err;
-      }
+    const result = await chrome.tabs.create({
+      url: url,
+      active: false,
+    }).catch(err => {
+      lastError = err;
+      return null;
+    });
+
+    if (result) {
+      return result;
+    }
+
+    console.log(`[Amazon Tracker] Tab creation attempt ${attempt + 1} failed: ${lastError?.message}`);
+
+    if (attempt < maxRetries - 1) {
+      // Wait before retrying (exponential backoff: 500ms, 1000ms, 2000ms)
+      await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt)));
     }
   }
+
+  // All retries failed
+  throw lastError;
 }
 
 async function scrapeSinglePage(filter, startIndex = 0) {
