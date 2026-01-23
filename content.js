@@ -220,7 +220,11 @@ function applyPosition(styleObj, position, height = null) {
     typeof position.left === 'number' &&
     typeof position.top === 'number'
   ) {
-    const constrained = constrainToViewport(position.left, position.top, height);
+    const constrained = constrainToViewport(
+      position.left,
+      position.top,
+      height,
+    );
     styleObj.left = constrained.left + 'px';
     styleObj.top = constrained.top + 'px';
   } else {
@@ -282,7 +286,24 @@ function showMinimizedIcon() {
   const icon = document.createElement('div');
   icon.id = 'amz-spending-popup';
 
-  // Icon always goes to bottom-right corner
+  const settings = getSettings();
+  const isLoading = isLoading30 || isLoading3M;
+
+  // Get spending amount from lowest active range
+  let spendingAmount = null;
+  if (settings.show30Days && cachedSpendingData.total !== undefined) {
+    spendingAmount = Math.round(cachedSpendingData.total);
+  } else if (
+    settings.show3Months &&
+    cachedSpendingData.total3Months !== undefined
+  ) {
+    spendingAmount = Math.round(cachedSpendingData.total3Months);
+  }
+
+  // Determine if we need pill shape (for amount) or circle (for $ icon)
+  const showAmount = !isLoading && spendingAmount !== null;
+
+  // Base styles for the icon
   Object.assign(icon.style, {
     position: 'fixed',
     bottom: '10px',
@@ -290,22 +311,62 @@ function showMinimizedIcon() {
     zIndex: '2147483647',
     backgroundColor: '#232f3e',
     color: '#ffffff',
-    width: '36px',
     height: '36px',
-    borderRadius: '50%',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    fontSize: '16px',
+    fontSize: '14px',
     fontWeight: 'bold',
     border: '2px solid #ffffff',
     boxSizing: 'border-box',
     userSelect: 'none',
   });
 
-  icon.innerHTML = '$';
+  // Check if no ranges are enabled
+  const noRangesEnabled = !settings.show30Days && !settings.show3Months;
+
+  if (showAmount) {
+    // Pill shape for amount - auto width with padding
+    icon.style.width = 'auto';
+    icon.style.minWidth = '36px';
+    icon.style.padding = '0 10px';
+    icon.style.borderRadius = '18px';
+    icon.innerHTML = `${spendingAmount}€`;
+  } else if (isLoading) {
+    // Circle with spinning € when loading
+    icon.style.width = '36px';
+    icon.style.borderRadius = '50%';
+    icon.innerHTML = `
+      <style>
+        @keyframes amz-icon-spinner {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+      <span style="animation: amz-icon-spinner 1s linear infinite; display: inline-block;">€</span>
+    `;
+  } else if (noRangesEnabled) {
+    // Circle with blinking ! if no ranges are enabled
+    icon.style.width = '36px';
+    icon.style.borderRadius = '50%';
+    icon.innerHTML = `
+      <style>
+        @keyframes amz-icon-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      </style>
+      <span style="animation: amz-icon-blink 1s ease-in-out infinite; font-size: 18px;">!</span>
+    `;
+  } else {
+    // Circle with € if data not yet loaded
+    icon.style.width = '36px';
+    icon.style.borderRadius = '50%';
+    icon.innerHTML = '€';
+  }
+
   icon.onclick = () => {
     if (cachedSpendingData) {
       injectPopup(cachedSpendingData);
@@ -385,7 +446,12 @@ function setupDraggable(popup) {
 
   const dragStart = e => {
     if (e.target === dragHandle || dragHandle.contains(e.target)) {
-      if (e.target.id === 'amz-close' || e.target.id === 'amz-settings' || e.target.id === 'amz-back') return; // Don't drag when clicking buttons
+      if (
+        e.target.id === 'amz-close' ||
+        e.target.id === 'amz-settings' ||
+        e.target.id === 'amz-back'
+      )
+        return; // Don't drag when clicking buttons
       isDragging = true;
       hasDragged = false;
       const rect = popup.getBoundingClientRect();
@@ -445,8 +511,9 @@ function injectPopup(data) {
   popup.id = 'amz-spending-popup';
 
   // Calculate height based on enabled ranges
-  const enabledCount = (settings.show30Days ? 1 : 0) + (settings.show3Months ? 1 : 0);
-  const popupHeight = enabledCount === 2 ? 130 : enabledCount === 1 ? 85 : 60;
+  const enabledCount =
+    (settings.show30Days ? 1 : 0) + (settings.show3Months ? 1 : 0);
+  const popupHeight = enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85;
 
   const baseStyle = {
     position: 'fixed',
@@ -469,9 +536,10 @@ function injectPopup(data) {
   Object.assign(popup.style, baseStyle);
 
   const is30DaysLoading = data.total === undefined;
-  const warning30 = !is30DaysLoading && data.limitReached
-    ? `<div style="font-size:10px; color:#ff9900;">⚠ Max 20 pages</div>`
-    : '';
+  const warning30 =
+    !is30DaysLoading && data.limitReached
+      ? `<div style="font-size:10px; color:#ff9900;">⚠ Max 20 pages</div>`
+      : '';
 
   const is3MonthsLoading = data.total3Months === undefined;
   const warning3Months =
@@ -510,7 +578,9 @@ function injectPopup(data) {
   let threeMonthsContent = '';
   if (settings.show3Months) {
     const time3M = data.updatedAt3M ? formatRelativeTime(data.updatedAt3M) : '';
-    const separator = settings.show30Days ? 'border-top:1px solid #e7e7e7; padding-top:4px;' : '';
+    const separator = settings.show30Days
+      ? 'border-top:1px solid #e7e7e7; padding-top:4px;'
+      : '';
     const innerContent = is3MonthsLoading
       ? `<div>
           <div style="display:flex; align-items:center; gap:6px;">
@@ -531,9 +601,11 @@ function injectPopup(data) {
   }
 
   // Message when no ranges are enabled
-  const noRangesMessage = enabledCount === 0
-    ? `<div style="color:#565959; text-align:center;">No ranges enabled</div>`
-    : '';
+  const gearIcon = `<svg style="vertical-align: middle; margin: 0 2px;" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+  const noRangesMessage =
+    enabledCount === 0
+      ? `<div style="color:#565959; text-align:center; line-height: 1.4;">No ranges enabled, click on ${gearIcon} to enable a range</div>`
+      : '';
 
   popup.innerHTML = `
         <style>
@@ -550,7 +622,7 @@ function injectPopup(data) {
                 <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </div>
         </div>
-        <div style="padding:6px 8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
+        <div style="padding:8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
             ${thirtyDaysContent}
             ${threeMonthsContent}
             ${noRangesMessage}
@@ -752,23 +824,26 @@ function refreshAll() {
 
         // Load 3 months if enabled and not already loading
         if (will3MLoad) {
-          safeSendMessage({ action: 'GET_SPENDING_3M', force: true }, response3M => {
-            isLoading3M = false;
-            if (response3M && response3M.error === 'TAB_CREATE_FAILED') {
-              showErrorPopup('TAB_CREATE_FAILED');
-              return;
-            }
-            if (response3M && !response3M.error) {
-              cachedSpendingData = {
-                ...cachedSpendingData,
-                total3Months: response3M.total,
-                orderCount3Months: response3M.orderCount,
-                limitReached3Months: response3M.limitReached,
-                updatedAt3M: response3M.updatedAt,
-              };
-              injectPopup(cachedSpendingData);
-            }
-          });
+          safeSendMessage(
+            { action: 'GET_SPENDING_3M', force: true },
+            response3M => {
+              isLoading3M = false;
+              if (response3M && response3M.error === 'TAB_CREATE_FAILED') {
+                showErrorPopup('TAB_CREATE_FAILED');
+                return;
+              }
+              if (response3M && !response3M.error) {
+                cachedSpendingData = {
+                  ...cachedSpendingData,
+                  total3Months: response3M.total,
+                  orderCount3Months: response3M.orderCount,
+                  limitReached3Months: response3M.limitReached,
+                  updatedAt3M: response3M.updatedAt,
+                };
+                injectPopup(cachedSpendingData);
+              }
+            },
+          );
         }
       }
     });
@@ -810,8 +885,14 @@ function loadData(showLoading = true) {
   }
 
   // Determine what data we need to load (also check if not already loading)
-  const need30Days = settings.show30Days && cachedSpendingData?.total === undefined && !isLoading30;
-  const need3Months = settings.show3Months && cachedSpendingData?.total3Months === undefined && !isLoading3M;
+  const need30Days =
+    settings.show30Days &&
+    cachedSpendingData?.total === undefined &&
+    !isLoading30;
+  const need3Months =
+    settings.show3Months &&
+    cachedSpendingData?.total3Months === undefined &&
+    !isLoading3M;
 
   // Check if we have any data to show already
   const hasData30 = cachedSpendingData?.total !== undefined;
@@ -833,8 +914,10 @@ function loadData(showLoading = true) {
   if (need3Months) isLoading3M = true;
 
   // Show loading only if we have no data at all, otherwise show current data with loader for missing part
-  if (showLoading && !savedState.isMinimized) {
-    if (hasAnyData) {
+  if (showLoading) {
+    if (savedState.isMinimized) {
+      showMinimizedIcon(); // Show icon with loading state
+    } else if (hasAnyData) {
       // Show existing data immediately - injectPopup handles showing loader for missing ranges
       injectPopup(cachedSpendingData);
     } else {
@@ -859,8 +942,11 @@ function loadData(showLoading = true) {
           updatedAt30: response30.updatedAt,
         };
 
-        // Update popup
-        if (!savedState.isMinimized) {
+        // Update popup or icon
+        const currentState = getPopupState();
+        if (currentState.isMinimized) {
+          showMinimizedIcon();
+        } else {
           injectPopup(cachedSpendingData);
         }
 
@@ -881,8 +967,10 @@ function loadData(showLoading = true) {
                 updatedAt3M: response3M.updatedAt,
               };
 
-              const currentPopup = document.getElementById('amz-spending-popup');
-              if (currentPopup && currentPopup.querySelector('#amz-drag-handle')) {
+              const currentState3M = getPopupState();
+              if (currentState3M.isMinimized) {
+                showMinimizedIcon();
+              } else {
                 injectPopup(cachedSpendingData);
               }
             }
@@ -909,7 +997,10 @@ function loadData(showLoading = true) {
           updatedAt3M: response3M.updatedAt,
         };
 
-        if (!savedState.isMinimized) {
+        const currentStateOnly3M = getPopupState();
+        if (currentStateOnly3M.isMinimized) {
+          showMinimizedIcon();
+        } else {
           injectPopup(cachedSpendingData);
         }
       } else if (response3M && response3M.error === 'AUTH_REQUIRED') {
@@ -965,23 +1056,41 @@ function handleCheckoutPage() {
   const tryThreeMonths = () => {
     if (!settings.show3Months) return;
 
-    safeSendMessage({ action: 'GET_SPENDING_3M', cacheOnly: true }, response3M => {
-      if (response3M && !response3M.error && !response3M.noCache && response3M.total !== undefined && response3M.total > 0) {
-        injectCheckoutAlert(response3M.total, 'In the last 3 months');
-      }
-    });
+    safeSendMessage(
+      { action: 'GET_SPENDING_3M', cacheOnly: true },
+      response3M => {
+        if (
+          response3M &&
+          !response3M.error &&
+          !response3M.noCache &&
+          response3M.total !== undefined &&
+          response3M.total > 0
+        ) {
+          injectCheckoutAlert(response3M.total, 'In the last 3 months');
+        }
+      },
+    );
   };
 
   // First try 30 days if enabled in settings
   if (settings.show30Days) {
-    safeSendMessage({ action: 'GET_SPENDING_30', cacheOnly: true }, response30 => {
-      if (response30 && !response30.error && !response30.noCache && response30.total !== undefined && response30.total > 0) {
-        injectCheckoutAlert(response30.total, 'This month');
-        return;
-      }
-      // No 30 days data, try 3 months as fallback
-      tryThreeMonths();
-    });
+    safeSendMessage(
+      { action: 'GET_SPENDING_30', cacheOnly: true },
+      response30 => {
+        if (
+          response30 &&
+          !response30.error &&
+          !response30.noCache &&
+          response30.total !== undefined &&
+          response30.total > 0
+        ) {
+          injectCheckoutAlert(response30.total, 'This month');
+          return;
+        }
+        // No 30 days data, try 3 months as fallback
+        tryThreeMonths();
+      },
+    );
   } else {
     // 30 days disabled, try 3 months directly
     tryThreeMonths();
