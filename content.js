@@ -919,19 +919,19 @@ function injectCheckoutAlert(spendingAmount, rangeLabel) {
 function handleCheckoutPage() {
   // First try to get cached data from storage
   safeSendMessage({ action: 'GET_SPENDING_30' }, response30 => {
-    if (response30 && !response30.error && response30.total !== undefined) {
-      // We have 30 days data
+    if (response30 && !response30.error && response30.total !== undefined && response30.total > 0) {
+      // We have 30 days data with spending
       injectCheckoutAlert(response30.total, 'This month');
       return;
     }
 
-    // No 30 days data, try 3 months
+    // No 30 days data or zero spending, try 3 months
     safeSendMessage({ action: 'GET_SPENDING_3M' }, response3M => {
-      if (response3M && !response3M.error && response3M.total !== undefined) {
-        // We have 3 months data
+      if (response3M && !response3M.error && response3M.total !== undefined && response3M.total > 0) {
+        // We have 3 months data with spending
         injectCheckoutAlert(response3M.total, 'In the last 3 months');
       }
-      // If no data at all, don't show anything
+      // If no data or zero spending, don't show anything
     });
   });
 }
