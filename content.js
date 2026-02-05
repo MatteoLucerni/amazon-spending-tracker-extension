@@ -656,10 +656,10 @@ function injectPopup(data) {
   const popup = document.createElement('div');
   popup.id = 'amz-spending-popup';
 
-  // Calculate height based on enabled ranges (add 18px for lock status)
+  // Calculate height based on enabled ranges (add extra height for lock status)
   const enabledCount =
     (settings.show30Days ? 1 : 0) + (settings.show3Months ? 1 : 0);
-  const popupHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 18;
+  const popupHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 24;
 
   const baseStyle = {
     position: 'fixed',
@@ -755,8 +755,8 @@ function injectPopup(data) {
 
   // Lock status message
   const lockStatusMessage = settings.interfaceLockEnabled
-    ? `<div style="font-size:10px; color:#565959; text-align:center; border-top:1px solid #e7e7e7; padding-top:6px; padding-bottom:4px; margin-top:4px;">Lock: ${settings.lockStartTime} - ${settings.lockEndTime}</div>`
-    : `<div style="font-size:10px; color:#999; text-align:center; border-top:1px solid #e7e7e7; padding-top:6px; padding-bottom:4px; margin-top:4px;">Lock not configured</div>`;
+    ? `<div style="font-size:10px; color:#565959; text-align:center; border-top:1px solid #e7e7e7; padding-top:6px; margin-top:4px;">Lock: ${settings.lockStartTime} - ${settings.lockEndTime}</div>`
+    : `<div style="font-size:10px; color:#999; text-align:center; border-top:1px solid #e7e7e7; padding-top:6px; margin-top:4px;">Lock not configured</div>`;
 
   popup.innerHTML = `
         <style>
@@ -773,7 +773,7 @@ function injectPopup(data) {
                 <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </div>
         </div>
-        <div style="padding:8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
+        <div style="padding:8px 8px 10px 8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
             ${thirtyDaysContent}
             ${threeMonthsContent}
             ${noRangesMessage}
