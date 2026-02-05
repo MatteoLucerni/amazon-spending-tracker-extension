@@ -43,12 +43,26 @@ function getSettings() {
   try {
     const saved = localStorage.getItem('amz-spending-settings');
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // Ensure all settings have defaults
+      return {
+        show30Days: parsed.show30Days !== undefined ? parsed.show30Days : true,
+        show3Months: parsed.show3Months !== undefined ? parsed.show3Months : true,
+        interfaceLockEnabled: parsed.interfaceLockEnabled || false,
+        lockStartTime: parsed.lockStartTime || '09:00',
+        lockEndTime: parsed.lockEndTime || '17:00',
+      };
     }
   } catch (e) {
     console.error('Tracker: Error reading settings', e);
   }
-  return { show30Days: true, show3Months: true };
+  return {
+    show30Days: true,
+    show3Months: true,
+    interfaceLockEnabled: false,
+    lockStartTime: '09:00',
+    lockEndTime: '17:00',
+  };
 }
 
 function saveSettings(settings) {
@@ -94,15 +108,15 @@ function showSettingsView() {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '160px',
-    height: '130px',
+    width: '180px',
+    height: '230px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
     overflow: 'hidden',
   };
 
-  applyPosition(baseStyle, savedState.position, 130);
+  applyPosition(baseStyle, savedState.position, 230);
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
@@ -113,6 +127,9 @@ function showSettingsView() {
       .amz-toggle .slider:before { position:absolute; content:""; height:12px; width:12px; left:2px; bottom:2px; background-color:white; transition:.2s; border-radius:50%; }
       .amz-toggle input:checked + .slider { background-color:#4caf50; }
       .amz-toggle input:checked + .slider:before { transform:translateX(12px); }
+      .amz-time-input { width:60px; padding:2px 4px; border:1px solid #d5d9d9; border-radius:4px; font-size:11px; font-family:inherit; }
+      .amz-time-input:focus { outline:none; border-color:#232f3e; }
+      .amz-section-divider { border-top:1px solid #e7e7e7; margin:6px 0; padding-top:6px; }
     </style>
     <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
       <span>Settings</span>
@@ -121,7 +138,7 @@ function showSettingsView() {
         <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </div>
     </div>
-    <div style="padding:10px 8px; font-size:12px; display:flex; flex-direction:column; gap:10px;">
+    <div style="padding:10px 8px; font-size:12px; display:flex; flex-direction:column; gap:8px;">
       <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
         <span>Last 30 days</span>
         <div class="amz-toggle">
@@ -136,6 +153,26 @@ function showSettingsView() {
           <span class="slider"></span>
         </div>
       </label>
+
+      <div class="amz-section-divider">
+        <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+          <span style="font-weight:600;">Interface Lock</span>
+          <div class="amz-toggle">
+            <input type="checkbox" id="amz-setting-lock" ${settings.interfaceLockEnabled ? 'checked' : ''}>
+            <span class="slider"></span>
+          </div>
+        </label>
+        <div id="amz-lock-times" style="margin-top:8px; display:${settings.interfaceLockEnabled ? 'flex' : 'none'}; flex-direction:column; gap:6px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="color:#565959; font-size:11px;">From:</span>
+            <input type="time" id="amz-lock-start" class="amz-time-input" value="${settings.lockStartTime}">
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="color:#565959; font-size:11px;">To:</span>
+            <input type="time" id="amz-lock-end" class="amz-time-input" value="${settings.lockEndTime}">
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -143,31 +180,41 @@ function showSettingsView() {
 
   document.getElementById('amz-close').onclick = () => showMinimizedIcon();
   document.getElementById('amz-back').onclick = () => {
-    // Save settings before going back
-    const newSettings = {
-      show30Days: document.getElementById('amz-setting-30days').checked,
-      show3Months: document.getElementById('amz-setting-3months').checked,
-    };
+    // Save all settings before going back
+    const newSettings = getCurrentSettingsFromForm();
     saveSettings(newSettings);
     // Load data (will fetch missing ranges if newly enabled)
     loadData(true);
   };
 
-  // Auto-save on checkbox change
-  document.getElementById('amz-setting-30days').onchange = () => {
-    const newSettings = {
+  // Helper to get all current settings from the form
+  function getCurrentSettingsFromForm() {
+    return {
       show30Days: document.getElementById('amz-setting-30days').checked,
       show3Months: document.getElementById('amz-setting-3months').checked,
+      interfaceLockEnabled: document.getElementById('amz-setting-lock').checked,
+      lockStartTime: document.getElementById('amz-lock-start').value,
+      lockEndTime: document.getElementById('amz-lock-end').value,
     };
-    saveSettings(newSettings);
+  }
+
+  // Auto-save on any setting change
+  const saveCurrentSettings = () => {
+    saveSettings(getCurrentSettingsFromForm());
   };
-  document.getElementById('amz-setting-3months').onchange = () => {
-    const newSettings = {
-      show30Days: document.getElementById('amz-setting-30days').checked,
-      show3Months: document.getElementById('amz-setting-3months').checked,
-    };
-    saveSettings(newSettings);
+
+  document.getElementById('amz-setting-30days').onchange = saveCurrentSettings;
+  document.getElementById('amz-setting-3months').onchange = saveCurrentSettings;
+
+  // Interface lock toggle - show/hide time inputs
+  document.getElementById('amz-setting-lock').onchange = () => {
+    const lockTimes = document.getElementById('amz-lock-times');
+    lockTimes.style.display = document.getElementById('amz-setting-lock').checked ? 'flex' : 'none';
+    saveCurrentSettings();
   };
+
+  document.getElementById('amz-lock-start').onchange = saveCurrentSettings;
+  document.getElementById('amz-lock-end').onchange = saveCurrentSettings;
 
   setupDraggable(popup);
 }
@@ -1097,6 +1144,201 @@ function handleCheckoutPage() {
   }
 }
 
+// Interface Lock Functions
+let lockTimerInterval = null;
+
+// Check if current time is within the lock time range
+function isInLockTimeRange(settings) {
+  if (!settings.interfaceLockEnabled) return false;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const [startHour, startMin] = settings.lockStartTime.split(':').map(Number);
+  const [endHour, endMin] = settings.lockEndTime.split(':').map(Number);
+  const startMinutes = startHour * 60 + startMin;
+  const endMinutes = endHour * 60 + endMin;
+
+  // Handle overnight ranges (e.g., 22:00 to 06:00)
+  if (startMinutes > endMinutes) {
+    return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+  }
+
+  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+}
+
+// Calculate time remaining until unlock
+function calculateTimeUntilUnlock(settings) {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const currentSeconds = now.getSeconds();
+
+  const [endHour, endMin] = settings.lockEndTime.split(':').map(Number);
+  const [startHour, startMin] = settings.lockStartTime.split(':').map(Number);
+  const startMinutes = startHour * 60 + startMin;
+  const endMinutes = endHour * 60 + endMin;
+
+  let minutesUntilUnlock;
+
+  // Handle overnight ranges
+  if (startMinutes > endMinutes) {
+    if (currentMinutes >= startMinutes) {
+      // After start time, unlock tomorrow at end time
+      minutesUntilUnlock = (24 * 60 - currentMinutes) + endMinutes;
+    } else {
+      // Before end time, unlock today
+      minutesUntilUnlock = endMinutes - currentMinutes;
+    }
+  } else {
+    minutesUntilUnlock = endMinutes - currentMinutes;
+  }
+
+  // Convert to hours, minutes, seconds
+  const totalSeconds = minutesUntilUnlock * 60 - currentSeconds;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return { hours, minutes, seconds, totalSeconds };
+}
+
+// Format time for display
+function formatLockTime(hours, minutes, seconds) {
+  const pad = n => n.toString().padStart(2, '0');
+  if (hours > 0) {
+    return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${minutes}:${pad(seconds)}`;
+}
+
+// Show the lock overlay
+function showLockOverlay(settings, spendingData) {
+  // Remove any existing overlay
+  const existingOverlay = document.getElementById('amz-lock-overlay');
+  if (existingOverlay) existingOverlay.remove();
+
+  // Also remove spending popup if it exists
+  const existingPopup = document.getElementById('amz-spending-popup');
+  if (existingPopup) existingPopup.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'amz-lock-overlay';
+
+  Object.assign(overlay.style, {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    width: '100vw',
+    height: '100vh',
+    backgroundColor: 'rgba(35, 47, 62, 0.97)',
+    zIndex: '2147483647',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    fontFamily: 'Amazon Ember, Arial, sans-serif',
+    color: '#ffffff',
+  });
+
+  // Build spending info if available
+  let spendingInfo = '';
+  if (spendingData) {
+    let amount = null;
+    let rangeLabel = '';
+
+    if (spendingData.total !== undefined) {
+      amount = Math.round(spendingData.total);
+      rangeLabel = 'in the last 30 days';
+    } else if (spendingData.total3Months !== undefined) {
+      amount = Math.round(spendingData.total3Months);
+      rangeLabel = 'in the last 3 months';
+    }
+
+    if (amount !== null) {
+      spendingInfo = `
+        <div style="margin-top:30px; text-align:center;">
+          <div style="font-size:14px; color:#ff9900; margin-bottom:8px;">You have spent</div>
+          <div style="font-size:48px; font-weight:700; color:#ff9900;">${amount} €</div>
+          <div style="font-size:14px; color:#a0a0a0; margin-top:4px;">${rangeLabel}</div>
+        </div>
+      `;
+    }
+  }
+
+  const timeLeft = calculateTimeUntilUnlock(settings);
+  const formattedTime = formatLockTime(timeLeft.hours, timeLeft.minutes, timeLeft.seconds);
+
+  overlay.innerHTML = `
+    <style>
+      @keyframes amz-lock-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.05); opacity: 0.9; }
+      }
+    </style>
+    <div style="text-align:center;">
+      <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ff9900" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="animation: amz-lock-pulse 2s ease-in-out infinite;">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      <h1 style="font-size:28px; font-weight:700; margin:20px 0 10px 0;">Amazon is Locked</h1>
+      <p style="font-size:14px; color:#a0a0a0; margin:0;">Time set: ${settings.lockStartTime} - ${settings.lockEndTime}</p>
+    </div>
+    <div style="margin-top:40px; text-align:center;">
+      <div style="font-size:14px; color:#a0a0a0; margin-bottom:10px;">Unlocks in</div>
+      <div id="amz-lock-timer" style="font-size:64px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:2px;">${formattedTime}</div>
+    </div>
+    ${spendingInfo}
+    <div style="position:absolute; bottom:30px; left:0; right:0; text-align:center;">
+      <p style="font-size:12px; color:#565959; margin:0;">Amazon Spending Tracker</p>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Start the countdown timer
+  startLockTimer(settings);
+}
+
+// Start the countdown timer
+function startLockTimer(settings) {
+  // Clear any existing timer
+  if (lockTimerInterval) {
+    clearInterval(lockTimerInterval);
+  }
+
+  lockTimerInterval = setInterval(() => {
+    const timerElement = document.getElementById('amz-lock-timer');
+    if (!timerElement) {
+      clearInterval(lockTimerInterval);
+      return;
+    }
+
+    // Check if we should still be locked
+    if (!isInLockTimeRange(settings)) {
+      clearInterval(lockTimerInterval);
+      removeLockOverlay();
+      // Re-initialize the normal popup
+      loadData(true);
+      return;
+    }
+
+    const timeLeft = calculateTimeUntilUnlock(settings);
+    timerElement.textContent = formatLockTime(timeLeft.hours, timeLeft.minutes, timeLeft.seconds);
+  }, 1000);
+}
+
+// Remove the lock overlay
+function removeLockOverlay() {
+  const overlay = document.getElementById('amz-lock-overlay');
+  if (overlay) {
+    overlay.remove();
+  }
+  if (lockTimerInterval) {
+    clearInterval(lockTimerInterval);
+    lockTimerInterval = null;
+  }
+}
+
 // Observe DOM changes to inject alert when subtotals appears
 function observeCheckoutPage() {
   // Try immediately first
@@ -1124,12 +1366,60 @@ function observeCheckoutPage() {
   setTimeout(() => observer.disconnect(), 10000);
 }
 
+// Load spending data from cache for lock overlay
+function loadSpendingDataForLock(callback) {
+  const settings = getSettings();
+
+  // Try to get cached data for display on lock screen
+  if (settings.show30Days) {
+    safeSendMessage({ action: 'GET_SPENDING_30', cacheOnly: true }, response30 => {
+      if (response30 && !response30.error && !response30.noCache && response30.total !== undefined) {
+        callback({ total: response30.total });
+        return;
+      }
+      // Try 3 months as fallback
+      if (settings.show3Months) {
+        safeSendMessage({ action: 'GET_SPENDING_3M', cacheOnly: true }, response3M => {
+          if (response3M && !response3M.error && !response3M.noCache && response3M.total !== undefined) {
+            callback({ total3Months: response3M.total });
+          } else {
+            callback(null);
+          }
+        });
+      } else {
+        callback(null);
+      }
+    });
+  } else if (settings.show3Months) {
+    safeSendMessage({ action: 'GET_SPENDING_3M', cacheOnly: true }, response3M => {
+      if (response3M && !response3M.error && !response3M.noCache && response3M.total !== undefined) {
+        callback({ total3Months: response3M.total });
+      } else {
+        callback(null);
+      }
+    });
+  } else {
+    callback(null);
+  }
+}
+
 async function init() {
   // Skip if this is a scraping tab opened by background.js
   if (window.location.href.includes('_scraping=1')) return;
 
   // Skip signin pages
   if (window.location.href.includes('signin')) return;
+
+  const settings = getSettings();
+
+  // Check if interface lock is active
+  if (isInLockTimeRange(settings)) {
+    // Load spending data from cache and show lock overlay
+    loadSpendingDataForLock(spendingData => {
+      showLockOverlay(settings, spendingData);
+    });
+    return;
+  }
 
   // Handle checkout page specially
   if (window.location.href.includes('checkout')) {
