@@ -1394,11 +1394,12 @@ function showLockOverlay(settings, spendingData) {
       <p style="font-size:14px; color:#a0a0a0; margin:0;">Time set: ${settings.lockStartTime} - ${settings.lockEndTime}</p>
     </div>
     <div style="margin-top:40px; text-align:center;">
-      <div style="font-size:14px; color:#a0a0a0; margin-bottom:10px;">Unlocks in</div>
+      <div style="font-size:14px; color:#a0a0a0; margin-bottom:25px;">Unlocks in</div>
       <div id="amz-lock-timer" style="font-size:64px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:2px;">${formattedTime}</div>
     </div>
     ${spendingInfo}
     <div style="position:absolute; bottom:30px; left:0; right:0; text-align:center;">
+      <img src="${chrome.runtime.getURL('assets/images/icons/amz_icon.png')}" alt="Amazon Spending Tracker" style="width:24px; height:24px; margin-bottom:8px;">
       <p style="font-size:12px; color:#565959; margin:0;">Amazon Spending Tracker</p>
     </div>
   `;
