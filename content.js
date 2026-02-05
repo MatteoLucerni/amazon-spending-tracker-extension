@@ -99,6 +99,9 @@ function showSettingsView() {
   const popup = document.createElement('div');
   popup.id = 'amz-spending-popup';
 
+  const settingsWidth = 200;
+  const settingsHeight = 235;
+
   const baseStyle = {
     position: 'fixed',
     zIndex: '2147483647',
@@ -108,15 +111,15 @@ function showSettingsView() {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '180px',
-    height: '230px',
+    width: settingsWidth + 'px',
+    height: settingsHeight + 'px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
     overflow: 'hidden',
   };
 
-  applyPosition(baseStyle, savedState.position, 230);
+  applyPosition(baseStyle, savedState.position, settingsHeight, settingsWidth);
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
@@ -127,9 +130,9 @@ function showSettingsView() {
       .amz-toggle .slider:before { position:absolute; content:""; height:12px; width:12px; left:2px; bottom:2px; background-color:white; transition:.2s; border-radius:50%; }
       .amz-toggle input:checked + .slider { background-color:#4caf50; }
       .amz-toggle input:checked + .slider:before { transform:translateX(12px); }
-      .amz-time-input { width:60px; padding:2px 4px; border:1px solid #d5d9d9; border-radius:4px; font-size:11px; font-family:inherit; }
+      .amz-time-input { width:70px; padding:3px 6px; border:1px solid #d5d9d9; border-radius:4px; font-size:12px; font-family:inherit; }
       .amz-time-input:focus { outline:none; border-color:#232f3e; }
-      .amz-section-divider { border-top:1px solid #e7e7e7; margin:6px 0; padding-top:6px; }
+      .amz-section-divider { border-top:1px solid #e7e7e7; margin:8px 0; padding-top:8px; }
     </style>
     <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
       <span>Settings</span>
@@ -261,7 +264,7 @@ function getCurrentPopupPosition() {
 }
 
 // Apply position to a style object
-function applyPosition(styleObj, position, height = null) {
+function applyPosition(styleObj, position, height = null, width = null) {
   if (
     position &&
     typeof position.left === 'number' &&
@@ -271,6 +274,7 @@ function applyPosition(styleObj, position, height = null) {
       position.left,
       position.top,
       height,
+      width,
     );
     styleObj.left = constrained.left + 'px';
     styleObj.top = constrained.top + 'px';
@@ -281,16 +285,18 @@ function applyPosition(styleObj, position, height = null) {
 }
 
 // Constrain position to viewport bounds
-function constrainToViewport(left, top, height = null) {
+function constrainToViewport(left, top, height = null, width = null) {
   const viewportWidth = document.documentElement.clientWidth;
   const viewportHeight = document.documentElement.clientHeight;
   const margin = 10;
-  const popupWidth = 160;
-  // Use actual popup height if available, otherwise get from DOM or use default
+
+  // Use provided dimensions or get from DOM or use defaults
+  let popupWidth = width;
   let popupHeight = height;
-  if (!popupHeight) {
+  if (!popupWidth || !popupHeight) {
     const popup = document.getElementById('amz-spending-popup');
-    popupHeight = popup ? popup.offsetHeight : 130;
+    if (!popupWidth) popupWidth = popup ? popup.offsetWidth : 160;
+    if (!popupHeight) popupHeight = popup ? popup.offsetHeight : 130;
   }
 
   // Calculate max positions, ensuring they don't go below margin even if viewport is small
@@ -1256,10 +1262,10 @@ function showLockOverlay(settings, spendingData) {
 
     if (amount !== null) {
       spendingInfo = `
-        <div style="margin-top:30px; text-align:center;">
-          <div style="font-size:14px; color:#ff9900; margin-bottom:8px;">You have spent</div>
-          <div style="font-size:48px; font-weight:700; color:#ff9900;">${amount} €</div>
-          <div style="font-size:14px; color:#a0a0a0; margin-top:4px;">${rangeLabel}</div>
+        <div style="margin-top:50px; text-align:center;">
+          <div style="font-size:16px; color:#ff9900; margin-bottom:16px;">You have spent</div>
+          <div style="font-size:56px; font-weight:700; color:#ff9900; line-height:1;">${amount} €</div>
+          <div style="font-size:15px; color:#a0a0a0; margin-top:12px;">${rangeLabel}</div>
         </div>
       `;
     }
