@@ -166,12 +166,12 @@ function showSettingsView() {
           </div>
         </label>
         <div id="amz-lock-times" style="margin-top:8px; display:${settings.interfaceLockEnabled ? 'flex' : 'none'}; flex-direction:column; gap:6px;">
-          <div style="display:flex; align-items:center; justify-content:space-between;">
-            <span style="color:#565959; font-size:11px;">From:</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#565959; font-size:11px; width:32px;">From:</span>
             <input type="time" id="amz-lock-start" class="amz-time-input" value="${settings.lockStartTime}">
           </div>
-          <div style="display:flex; align-items:center; justify-content:space-between;">
-            <span style="color:#565959; font-size:11px;">To:</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#565959; font-size:11px; width:32px;">To:</span>
             <input type="time" id="amz-lock-end" class="amz-time-input" value="${settings.lockEndTime}">
           </div>
         </div>
