@@ -637,10 +637,10 @@ function injectPopup(data) {
   const popup = document.createElement('div');
   popup.id = 'amz-spending-popup';
 
-  // Calculate height based on enabled ranges
+  // Calculate height based on enabled ranges (add 18px for lock status)
   const enabledCount =
     (settings.show30Days ? 1 : 0) + (settings.show3Months ? 1 : 0);
-  const popupHeight = enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85;
+  const popupHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 18;
 
   const baseStyle = {
     position: 'fixed',
@@ -734,6 +734,11 @@ function injectPopup(data) {
       ? `<div style="color:#565959; text-align:center; line-height: 1.4;">No ranges enabled, click on ${gearIcon} to enable a range</div>`
       : '';
 
+  // Lock status message
+  const lockStatusMessage = settings.interfaceLockEnabled
+    ? `<div style="font-size:10px; color:#565959; text-align:center; border-top:1px solid #e7e7e7; padding-top:6px; margin-top:4px;">Lock: ${settings.lockStartTime} - ${settings.lockEndTime}</div>`
+    : `<div style="font-size:10px; color:#999; text-align:center; border-top:1px solid #e7e7e7; padding-top:6px; margin-top:4px;">Lock not configured</div>`;
+
   popup.innerHTML = `
         <style>
             @keyframes amz-spinner {
@@ -753,6 +758,7 @@ function injectPopup(data) {
             ${thirtyDaysContent}
             ${threeMonthsContent}
             ${noRangesMessage}
+            ${lockStatusMessage}
         </div>
     `;
 
