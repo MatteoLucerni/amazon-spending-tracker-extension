@@ -85,6 +85,62 @@ function formatRelativeTime(timestamp) {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
+// Show confirmation dialog for enabling interface lock
+function showLockConfirmDialog(onConfirm, onCancel) {
+  // Remove any existing dialog
+  const existingDialog = document.getElementById('amz-lock-confirm-dialog');
+  if (existingDialog) existingDialog.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'amz-lock-confirm-dialog';
+  Object.assign(overlay.style, {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    width: '100vw',
+    height: '100vh',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: '2147483647',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    fontFamily: 'Amazon Ember, Arial, sans-serif',
+  });
+
+  overlay.innerHTML = `
+    <div style="background:#fff; border-radius:8px; padding:20px; max-width:300px; box-shadow:0 4px 12px rgba(0,0,0,0.3); text-align:center;">
+      <div style="font-size:16px; font-weight:600; color:#0f1111; margin-bottom:12px;">Enable Interface Lock?</div>
+      <p style="font-size:13px; color:#565959; margin:0 0 20px 0; line-height:1.4;">
+        This will block your access to Amazon during the scheduled time. You won't be able to change this setting while locked.
+      </p>
+      <div style="display:flex; gap:10px; justify-content:center;">
+        <button id="amz-lock-cancel" style="padding:8px 16px; border:1px solid #d5d9d9; border-radius:4px; background:#fff; color:#0f1111; font-size:13px; cursor:pointer;">Cancel</button>
+        <button id="amz-lock-confirm" style="padding:8px 16px; border:none; border-radius:4px; background:#232f3e; color:#fff; font-size:13px; cursor:pointer;">Enable</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('amz-lock-cancel').onclick = () => {
+    overlay.remove();
+    if (onCancel) onCancel();
+  };
+
+  document.getElementById('amz-lock-confirm').onclick = () => {
+    overlay.remove();
+    if (onConfirm) onConfirm();
+  };
+
+  // Close on overlay click
+  overlay.onclick = (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+      if (onCancel) onCancel();
+    }
+  };
+}
+
 function showSettingsView() {
   const currentPosition = getCurrentPopupPosition();
   if (currentPosition) {
@@ -130,7 +186,7 @@ function showSettingsView() {
       .amz-toggle .slider:before { position:absolute; content:""; height:12px; width:12px; left:2px; bottom:2px; background-color:white; transition:.2s; border-radius:50%; }
       .amz-toggle input:checked + .slider { background-color:#4caf50; }
       .amz-toggle input:checked + .slider:before { transform:translateX(12px); }
-      .amz-time-input { width:70px; padding:3px 6px; border:1px solid #d5d9d9; border-radius:4px; font-size:12px; font-family:inherit; }
+      .amz-time-input { width:95px; padding:4px 6px; border:1px solid #d5d9d9; border-radius:4px; font-size:12px; font-family:inherit; }
       .amz-time-input:focus { outline:none; border-color:#232f3e; }
       .amz-section-divider { border-top:1px solid #e7e7e7; margin:8px 0; padding-top:8px; }
     </style>
@@ -209,11 +265,29 @@ function showSettingsView() {
   document.getElementById('amz-setting-30days').onchange = saveCurrentSettings;
   document.getElementById('amz-setting-3months').onchange = saveCurrentSettings;
 
-  // Interface lock toggle - show/hide time inputs
+  // Interface lock toggle - show/hide time inputs with confirmation
   document.getElementById('amz-setting-lock').onchange = () => {
+    const lockCheckbox = document.getElementById('amz-setting-lock');
     const lockTimes = document.getElementById('amz-lock-times');
-    lockTimes.style.display = document.getElementById('amz-setting-lock').checked ? 'flex' : 'none';
-    saveCurrentSettings();
+
+    if (lockCheckbox.checked) {
+      // Show confirmation dialog before enabling
+      showLockConfirmDialog(
+        () => {
+          // Confirmed - show time inputs and save
+          lockTimes.style.display = 'flex';
+          saveCurrentSettings();
+        },
+        () => {
+          // Cancelled - revert checkbox
+          lockCheckbox.checked = false;
+        }
+      );
+    } else {
+      // Disabling - no confirmation needed
+      lockTimes.style.display = 'none';
+      saveCurrentSettings();
+    }
   };
 
   document.getElementById('amz-lock-start').onchange = saveCurrentSettings;
