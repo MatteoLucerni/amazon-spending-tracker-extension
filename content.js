@@ -760,8 +760,8 @@ function injectPopup(data) {
 
   // Lock status message
   const lockStatusMessage = settings.interfaceLockEnabled
-    ? `<div style="font-size:10px; color:#565959; text-align:center; border-top:1px solid #e7e7e7; padding-top:6px; margin-top:4px;">Lock: ${settings.lockStartTime} - ${settings.lockEndTime}</div>`
-    : `<div style="font-size:10px; color:#999; text-align:center; border-top:1px solid #e7e7e7; padding-top:6px; margin-top:4px;">Lock not configured</div>`;
+    ? `<div style="font-size:10px; color:#565959; text-align:center; border-top:1px solid #e7e7e7; padding-top:3px">Lock: ${settings.lockStartTime} - ${settings.lockEndTime}</div>`
+    : `<div style="font-size:10px; color:#999; text-align:center; border-top:1px solid #e7e7e7; padding-top:3px">Lock not configured</div>`;
 
   popup.innerHTML = `
         <style>
