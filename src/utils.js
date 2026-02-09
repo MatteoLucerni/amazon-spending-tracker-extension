@@ -3,7 +3,12 @@ let contextInvalidated = false;
 
 function formatAmountHtml(allCurrencies, singleTotal, defaultSymbol) {
   if (allCurrencies && allCurrencies.length > 1) {
-    return allCurrencies.map(c => `${Math.round(c.total)} ${c.symbol}`).join(' · ');
+    const nonZero = allCurrencies.filter(c => Math.round(c.total) !== 0);
+    if (nonZero.length === 0) {
+      const symbol = defaultSymbol || getCurrentDomainConfig().symbol;
+      return `0 ${symbol}`;
+    }
+    return nonZero.map(c => `${Math.round(c.total)} ${c.symbol}`).join(' · ');
   }
   if (allCurrencies && allCurrencies.length === 1) {
     return `${Math.round(allCurrencies[0].total)} ${allCurrencies[0].symbol}`;
