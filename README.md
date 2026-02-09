@@ -5,7 +5,7 @@
 <h1 align="center">Amazon Spending Tracker</h1>
 
 <p align="center">
-  A privacy-first Chrome extension that tracks your Amazon spending across 21 regional domains — directly from your browser, with zero external servers.
+  A privacy-first Chrome extension that tracks your Amazon spending across 21 regional domains, directly from your browser, with zero external servers.
 </p>
 
 <p align="center">
@@ -45,7 +45,7 @@
 
 ## Overview
 
-**Amazon Spending Tracker** is an open-source Chrome extension that helps you stay aware of your Amazon spending habits. It reads your order history directly from your authenticated Amazon session and displays spending summaries in a sleek, draggable floating widget — right on any Amazon page.
+**Amazon Spending Tracker** is an open-source Chrome extension that helps you stay aware of your Amazon spending habits. It reads your order history directly from your authenticated Amazon session and displays spending summaries in a sleek, draggable floating widget, right on any Amazon page.
 
 All data is processed and stored locally in your browser. There are no external servers, no analytics, and no telemetry. Your spending data never leaves your machine.
 
@@ -56,24 +56,24 @@ All data is processed and stored locally in your browser. There are no external 
 ### Spending Tracking
 
 - **30-day and 3-month spending totals** scraped from your Amazon order history
-- **Multi-currency aggregation** — shopping across different Amazon regions is grouped by currency
+- **Multi-currency aggregation**: shopping across different Amazon regions is grouped by currency
 - **Smart caching** with 24-hour TTL, per-domain and per-range granularity
 - **Manual refresh** per individual range or all at once
 
 ### Floating Popup Widget
 
 - **Draggable popup** that snaps to left/right sides of the viewport
-- **Minimize to icon** — compact pill showing your spending total at a glance
-- **Responsive design** — three layout tiers: mobile (≤480px), tablet (≤768px), desktop
-- **Relative timestamps** — "5 min ago", "2 hours ago" for last refresh time
+- **Minimize to icon**: compact pill showing your spending total at a glance
+- **Responsive design**: three layout tiers: mobile (≤480px), tablet (≤768px), desktop
+- **Relative timestamps**: "5 min ago", "2 hours ago" for last refresh time
 
 ### Checkout Warning
 
-- **Spending banner on checkout pages** — a yellow ⚠️ warning showing how much you've already spent, injected directly on Amazon's checkout flow
+- **Spending banner on checkout pages**: a yellow ⚠️ warning showing how much you've already spent, injected directly on Amazon's checkout flow
 
 ### Interface Lock
 
-- **Time-based Amazon blocking** — configure a daily time window (e.g. 09:00–17:00) to block Amazon access
+- **Time-based Amazon blocking**: configure a daily time window (e.g. 09:00-17:00) to block Amazon access
 - **Full-screen lock overlay** with live countdown timer until unlock
 - **Confirmation dialog with countdown** to prevent accidental activation
 - **Spending summary visible** on the lock screen
@@ -86,9 +86,9 @@ All data is processed and stored locally in your browser. There are no external 
 
 ### Error Handling
 
-- **Auth detection** — prompts login when Amazon session has expired
-- **Tab limit handling** — graceful error when too many tabs are open
-- **Context invalidation** — detects extension updates and offers page refresh
+- **Auth detection**: prompts login when Amazon session has expired
+- **Tab limit handling**: graceful error when too many tabs are open
+- **Context invalidation**: detects extension updates and offers page refresh
 
 ---
 
@@ -122,9 +122,9 @@ The extension supports **21 Amazon regional domains** with localized price parsi
 
 **Price format legend:**
 
-- **US** — `1,234.56` (comma thousands, dot decimal)
-- **EU** — `1.234,56` (dot thousands, comma decimal)
-- **JP** — `1,234` (no decimal, comma thousands)
+- **US**: `1,234.56` (comma thousands, dot decimal)
+- **EU**: `1.234,56` (dot thousands, comma decimal)
+- **JP**: `1,234` (no decimal, comma thousands)
 
 ---
 
@@ -134,7 +134,7 @@ The extension supports **21 Amazon regional domains** with localized price parsi
 
 1. Visit the [Chrome Web Store listing](https://chromewebstore.google.com/detail/amazon-spending-tracker/ebpikpmmnpjmlcpanakfcgchkdjaanmm)
 2. Click **"Add to Chrome"**
-3. Navigate to any Amazon page — the spending widget appears automatically
+3. Navigate to any Amazon page. The spending widget appears automatically
 
 ### From Source (Developer Mode)
 
@@ -154,7 +154,7 @@ The extension supports **21 Amazon regional domains** with localized price parsi
 
 4. **Click "Load unpacked"** and select the cloned repository folder
 
-5. **Navigate to any Amazon page** — the extension activates automatically
+5. **Navigate to any Amazon page**. The extension activates automatically
 
 > **Note:** No build step is required. The extension uses plain JavaScript with zero dependencies.
 
@@ -165,7 +165,7 @@ The extension supports **21 Amazon regional domains** with localized price parsi
 1. **Content scripts** are injected on every Amazon page ([`src/main.js`](src/main.js) is the entry point)
 2. On load, the extension checks for lock mode, checkout pages, and onboarding status
 3. In normal mode, it sends a message to the **background service worker** ([`background.js`](background.js)) requesting spending data
-4. The service worker checks its **24-hour cache** — if fresh data exists, it returns immediately
+4. The service worker checks its **24-hour cache**. If fresh data exists, it returns immediately
 5. If cache is stale or a force-refresh is requested, the service worker:
    - Opens a **hidden background tab** to your Amazon order history page
    - Waits for the page to fully load (+ 2s buffer for dynamic content)
@@ -216,50 +216,38 @@ amazon-spending-tracker-extension/
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                        Amazon Page                           │
-│                                                              │
-│  main.js ──► initSettings() ──► checkOnboardingAndInit()     │
-│                                       │                      │
-│                          ┌────────────┼────────────┐         │
-│                          ▼            ▼            ▼         │
-│                     Lock Mode    Checkout     Normal Mode     │
-│                          │        Warning          │         │
-│                          ▼            │            ▼         │
-│                   showLockOverlay     │      injectPopup()   │
-│                          │            ▼            │         │
-│                          │   injectCheckoutAlert   │         │
-└──────────────────────────┼─────────────────────────┼─────────┘
-                           │                         │
-                           │    safeSendMessage()    │
-                           │          │              │
-                           ▼          ▼              ▼
-┌──────────────────────────────────────────────────────────────┐
-│                  background.js (Service Worker)              │
-│                                                              │
-│  chrome.runtime.onMessage ──► GET_SPENDING_30 / GET_SPENDING_3M  │
-│          │                                                   │
-│          ▼                                                   │
-│  Check cache (chrome.storage.local, 24h TTL)                 │
-│          │                                                   │
-│          ├── Cache hit ──► Return cached data                │
-│          │                                                   │
-│          └── Cache miss ──► scrapeWithTab()                  │
-│                                  │                           │
-│                                  ▼                           │
-│                     ┌── Create hidden tab ──┐                │
-│                     │  (order history page) │                │
-│                     │  Wait for page load   │                │
-│                     │  Execute parse script  │                │
-│                     │  Extract order totals  │                │
-│                     │  Paginate (max 200)   │                │
-│                     │  Close tab            │                │
-│                     └───────────────────────┘                │
-│                                  │                           │
-│                                  ▼                           │
-│                     Cache result ──► Return to content script │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph AmazonPage["Amazon Page (Content Scripts)"]
+        main["main.js"] --> initSettings["initSettings()"]
+        initSettings --> checkOnboarding["checkOnboardingAndInit()"]
+        checkOnboarding --> Lock["Lock Mode"]
+        checkOnboarding --> Checkout["Checkout Warning"]
+        checkOnboarding --> Normal["Normal Mode"]
+        Lock --> showLock["showLockOverlay()"]
+        Checkout --> injectAlert["injectCheckoutAlert()"]
+        Normal --> injectPopup["injectPopup()"]
+    end
+
+    showLock -- "safeSendMessage()" --> bgHandler
+    injectPopup -- "safeSendMessage()" --> bgHandler
+
+    subgraph ServiceWorker["background.js (Service Worker)"]
+        bgHandler["chrome.runtime.onMessage"] --> cacheCheck{"Check cache\n(24h TTL)"}
+        cacheCheck -- "Cache hit" --> returnCached["Return cached data"]
+        cacheCheck -- "Cache miss" --> scrape["scrapeWithTab()"]
+        scrape --> createTab["Create hidden tab\n(order history page)"]
+        createTab --> waitLoad["Wait for page load"]
+        waitLoad --> parseScript["Execute parse script"]
+        parseScript --> extractTotals["Extract order totals"]
+        extractTotals --> paginate["Paginate (max 200 orders)"]
+        paginate --> closeTab["Close tab"]
+        closeTab --> cacheResult["Cache result"]
+        cacheResult --> returnData["Return to content script"]
+    end
+
+    returnCached --> AmazonPage
+    returnData --> AmazonPage
 ```
 
 ### Data Storage
@@ -285,7 +273,7 @@ The extension provides the following user-configurable options, accessible via t
 | Lock Start Time    | 09:00       | Start of the lock window          |
 | Lock End Time      | 17:00       | End of the lock window            |
 
-The interface lock supports overnight ranges (e.g. 22:00–06:00). Enabling the lock requires explicit confirmation through a dialog with a 3-second countdown.
+The interface lock supports overnight ranges (e.g. 22:00-06:00). Enabling the lock requires explicit confirmation through a dialog with a 3-second countdown.
 
 ---
 
@@ -293,12 +281,12 @@ The interface lock supports overnight ranges (e.g. 22:00–06:00). Enabling the 
 
 **Amazon Spending Tracker is designed with privacy as the top priority.**
 
-- **Zero external network calls** — the extension never contacts any external server
-- **No analytics or telemetry** — no tracking pixels, no usage data collection, no crash reporting
-- **All data stored locally** — everything lives in `chrome.storage.local`, inside your browser
-- **No personal data stored** — only aggregate spending totals and order counts; no order details, product names, or personal information
-- **Scraping is read-only** — the extension reads your order page DOM to extract totals, never modifying anything
-- **Open source** — every line of code is publicly auditable in this repository
+- **Zero external network calls**: the extension never contacts any external server
+- **No analytics or telemetry**: no tracking pixels, no usage data collection, no crash reporting
+- **All data stored locally**: everything lives in `chrome.storage.local`, inside your browser
+- **No personal data stored**: only aggregate spending totals and order counts; no order details, product names, or personal information
+- **Scraping is read-only**: the extension reads your order page DOM to extract totals, never modifying anything
+- **Open source**: every line of code is publicly auditable in this repository
 
 Your spending data never leaves your machine. Period.
 
@@ -310,8 +298,8 @@ Your spending data never leaves your machine. Period.
 | ----------------- | ------------------------------------------------------------------------------------------------------- |
 | **Language**      | Vanilla JavaScript (ES6+)                                                                               |
 | **Extension API** | Chrome Extension Manifest V3                                                                            |
-| **Build Process** | None — plain JS, no bundler, no transpiler                                                              |
-| **Dependencies**  | Zero — no `node_modules`, no `package.json`                                                             |
+| **Build Process** | None. Plain JS, no bundler, no transpiler                                                               |
+| **Dependencies**  | Zero. No `node_modules`, no `package.json`                                                              |
 | **CSS**           | Injected programmatically via JavaScript                                                                |
 | **Hosting**       | GitHub Pages for the [landing page](https://matteolucerni.github.io/amazon-spending-tracker-extension/) |
 
@@ -323,7 +311,7 @@ Your spending data never leaves your machine. Period.
 | -------------------------------- | ------------------------------------------------------ |
 | `chrome.storage.local`           | Persist settings, spending cache, and onboarding state |
 | `chrome.storage.onChanged`       | Sync settings across tabs in real-time                 |
-| `chrome.runtime.sendMessage`     | Content script → service worker communication          |
+| `chrome.runtime.sendMessage`     | Content script to service worker communication         |
 | `chrome.runtime.onMessage`       | Service worker message handler                         |
 | `chrome.runtime.getURL`          | Load extension assets (icon) in content scripts        |
 | `chrome.tabs.create`             | Open hidden tabs for order page scraping               |
@@ -352,7 +340,7 @@ Contributions are welcome! Here's how to get started:
 
 ### Development Workflow
 
-- No build step needed — edit any `.js` file and reload the extension in `chrome://extensions`
+- No build step needed. Edit any `.js` file and reload the extension in `chrome://extensions`
 - The entire source is vanilla JavaScript; no tooling or environment setup required
 - Test on at least one Amazon domain after making changes
 - For domain-specific changes (price parsing, total patterns), test on the affected regional domain
@@ -375,22 +363,22 @@ When opening an issue, please include:
 - The Amazon domain you were on (e.g. amazon.de)
 - Steps to reproduce
 - Expected vs. actual behavior
-- Console errors (if any) from `chrome://extensions` → "Inspect views: service worker"
+- Console errors (if any) from `chrome://extensions` > "Inspect views: service worker"
 
 ### Areas for Contribution
 
-- 🌍 **New Amazon domain support** — add new regional domains in [`src/constants.js`](src/constants.js)
-- 🌐 **Localization improvements** — refine total label patterns for better regional matching
-- 🎨 **UI/UX enhancements** — improve the popup design, animations, or responsive behavior
-- 🐛 **Bug fixes** — resolve parsing edge cases, error handling gaps
-- 📝 **Documentation** — improve this README, add inline docs, or expand the landing page
-- ✅ **Testing** — help validate the extension across different Amazon domains and browsers
+- 🌍 **New Amazon domain support**: add new regional domains in [`src/constants.js`](src/constants.js)
+- 🌐 **Localization improvements**: refine total label patterns for better regional matching
+- 🎨 **UI/UX enhancements**: improve the popup design, animations, or responsive behavior
+- 🐛 **Bug fixes**: resolve parsing edge cases, error handling gaps
+- 📝 **Documentation**: improve this README, add inline docs, or expand the landing page
+- ✅ **Testing**: help validate the extension across different Amazon domains and browsers
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
 ---
 
