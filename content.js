@@ -657,6 +657,12 @@ function showLockConfirmDialog(onConfirm, onCancel) {
 }
 
 function showSettingsView() {
+  const mainPopup = document.getElementById('amz-spending-popup');
+  let mainRect = null;
+  if (mainPopup) {
+    mainRect = mainPopup.getBoundingClientRect();
+  }
+
   const currentPosition = getCurrentPopupPosition();
   if (currentPosition) {
     savePopupState(false, currentPosition);
@@ -765,6 +771,30 @@ function showSettingsView() {
   `;
 
   document.body.appendChild(popup);
+
+  const actualHeight = popup.offsetHeight;
+  const viewportHeight = document.documentElement.clientHeight;
+  const viewportWidth = document.documentElement.clientWidth;
+  const margin = 10;
+
+  if (mainRect) {
+    const viewportCenter = viewportWidth / 2;
+    const popupCenter = (mainRect.left + mainRect.right) / 2;
+    let newLeft = popupCenter < viewportCenter ? mainRect.left : mainRect.right - settingsWidth;
+    let newTop = mainRect.bottom - actualHeight;
+    newLeft = Math.max(margin, Math.min(newLeft, viewportWidth - settingsWidth - margin));
+    newTop = Math.max(margin, Math.min(newTop, viewportHeight - actualHeight - margin));
+    popup.style.left = newLeft + 'px';
+    popup.style.top = newTop + 'px';
+    popup.style.bottom = '';
+    popup.style.right = '';
+  } else if (popup.style.top) {
+    let currentTop = parseFloat(popup.style.top);
+    const maxTop = viewportHeight - actualHeight - margin;
+    if (currentTop > maxTop) {
+      popup.style.top = Math.max(margin, maxTop) + 'px';
+    }
+  }
 
   document.getElementById('amz-replay-tutorial').onclick = () => {
     popup.remove();
