@@ -1,6 +1,24 @@
 let cachedSpendingData = {};
 let contextInvalidated = false;
 
+function formatAmountHtml(allCurrencies, singleTotal, defaultSymbol) {
+  if (allCurrencies && allCurrencies.length > 1) {
+    return allCurrencies.map(c => `${Math.round(c.total)} ${c.symbol}`).join(' · ');
+  }
+  if (allCurrencies && allCurrencies.length === 1) {
+    return `${Math.round(allCurrencies[0].total)} ${allCurrencies[0].symbol}`;
+  }
+  const symbol = defaultSymbol || getCurrentDomainConfig().symbol;
+  return `${Math.round(singleTotal)} ${symbol}`;
+}
+
+function getTotalOrders(allCurrencies, singleOrderCount) {
+  if (allCurrencies && allCurrencies.length > 0) {
+    return allCurrencies.reduce((sum, c) => sum + c.orderCount, 0);
+  }
+  return singleOrderCount;
+}
+
 function getResponsiveConfig() {
   const vw = document.documentElement.clientWidth;
   if (vw <= 480) return { tier: 'mobile', popupWidth: vw - 20, settingsWidth: vw - 20, maxSettingsHeight: '70vh', draggable: false, tourTooltipMode: 'bottom-sheet', tourTooltipMaxWidth: vw - 32, welcomeMaxWidth: vw - 32, minIconSize: 44 };

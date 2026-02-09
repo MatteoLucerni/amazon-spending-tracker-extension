@@ -52,7 +52,7 @@ function showMinimizedIcon() {
     icon.style.minWidth = '36px';
     icon.style.padding = '0 10px';
     icon.style.borderRadius = '18px';
-    icon.innerHTML = `${spendingAmount}€`;
+    icon.innerHTML = `${spendingAmount}${cachedSpendingData.symbol || getCurrentDomainConfig().symbol}`;
   } else if (isLoading) {
     icon.style.width = '36px';
     icon.style.borderRadius = '50%';
@@ -63,7 +63,7 @@ function showMinimizedIcon() {
           100% { transform: rotate(360deg); }
         }
       </style>
-      <span style="animation: amz-icon-spinner 1s linear infinite; display: inline-block;">€</span>
+      <span style="animation: amz-icon-spinner 1s linear infinite; display: inline-block;">${getCurrentDomainConfig().symbol}</span>
     `;
   } else if (noRangesEnabled) {
     icon.style.width = '36px';
@@ -80,7 +80,7 @@ function showMinimizedIcon() {
   } else {
     icon.style.width = '36px';
     icon.style.borderRadius = '50%';
-    icon.innerHTML = '€';
+    icon.innerHTML = getCurrentDomainConfig().symbol;
   }
 
   icon.onclick = () => {
@@ -246,7 +246,8 @@ function injectPopup(data) {
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
     width: rc.popupWidth + 'px',
-    height: popupHeight + 'px',
+    height: 'auto',
+    minHeight: popupHeight + 'px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
@@ -289,10 +290,10 @@ function injectPopup(data) {
       : `<div>
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="color:#565959;">Last 30 days:</span>
-            <b style="color:#B12704; font-size:14px;">${Math.round(data.total)} €</b>
+            <b style="color:#B12704; font-size:14px;">${formatAmountHtml(data.allCurrencies30, data.total, data.symbol)}</b>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:11px; color:#767676;">${data.orderCount} order${data.orderCount !== 1 ? 's' : ''}${time30 ? ` · ${time30}` : ''} ${warning30}</span>
+            <span style="font-size:11px; color:#767676;">${getTotalOrders(data.allCurrencies30, data.orderCount)} order${getTotalOrders(data.allCurrencies30, data.orderCount) !== 1 ? 's' : ''}${time30 ? ` · ${time30}` : ''} ${warning30}</span>
             <span id="amz-refresh-30">${REFRESH_ICON_SVG}</span>
           </div>
         </div>`;
@@ -314,10 +315,10 @@ function injectPopup(data) {
         </div>`
       : `<div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="color:#565959;">Last 3 months:</span>
-          <b style="color:#B12704; font-size:14px;">${Math.round(data.total3Months)} €</b>
+          <b style="color:#B12704; font-size:14px;">${formatAmountHtml(data.allCurrencies3M, data.total3Months, data.symbol)}</b>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:11px; color:#767676;">${data.orderCount3Months} order${data.orderCount3Months !== 1 ? 's' : ''}${time3M ? ` · ${time3M}` : ''} ${warning3Months}</span>
+          <span style="font-size:11px; color:#767676;">${getTotalOrders(data.allCurrencies3M, data.orderCount3Months)} order${getTotalOrders(data.allCurrencies3M, data.orderCount3Months) !== 1 ? 's' : ''}${time3M ? ` · ${time3M}` : ''} ${warning3Months}</span>
           <span id="amz-refresh-3m">${REFRESH_ICON_SVG}</span>
         </div>`;
     threeMonthsContent = `<div style="${separator}">${innerContent}</div>`;
@@ -470,7 +471,7 @@ function showErrorPopup(errorType) {
   }
   const loginBtn = document.getElementById('amz-go-login');
   if (loginBtn) {
-    loginBtn.onclick = () => { window.location.href = 'https://www.amazon.it/ap/signin'; };
+    loginBtn.onclick = () => { window.location.href = 'https://' + window.location.hostname + '/ap/signin'; };
   }
 
   setupDraggable(popup);

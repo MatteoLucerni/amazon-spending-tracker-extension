@@ -15,3 +15,37 @@ const BACK_ICON_SVG = `<svg id="amz-back" style="cursor:pointer; padding:0 2px;"
 const SPINNER_STYLE = `<style>@keyframes amz-spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>`;
 
 const HELP_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><text x="12" y="16" text-anchor="middle" fill="currentColor" stroke="none" font-size="12" font-weight="600">?</text></svg>`;
+
+const AMAZON_DOMAINS = {
+  'www.amazon.com': { currency: 'USD', symbol: '$', totalPattern: 'total', priceFormat: 'us' },
+  'www.amazon.co.uk': { currency: 'GBP', symbol: '£', totalPattern: 'total', priceFormat: 'us' },
+  'www.amazon.de': { currency: 'EUR', symbol: '€', totalPattern: 'total|gesamtbetrag|summe', priceFormat: 'eu' },
+  'www.amazon.fr': { currency: 'EUR', symbol: '€', totalPattern: 'total|montant', priceFormat: 'eu' },
+  'www.amazon.it': { currency: 'EUR', symbol: '€', totalPattern: 'total|totale', priceFormat: 'eu' },
+  'www.amazon.es': { currency: 'EUR', symbol: '€', totalPattern: 'total|importe', priceFormat: 'eu' },
+  'www.amazon.co.jp': { currency: 'JPY', symbol: '¥', totalPattern: '合計|total', priceFormat: 'jp' },
+  'www.amazon.ca': { currency: 'CAD', symbol: 'CA$', totalPattern: 'total', priceFormat: 'us' },
+  'www.amazon.com.au': { currency: 'AUD', symbol: 'A$', totalPattern: 'total', priceFormat: 'us' },
+  'www.amazon.in': { currency: 'INR', symbol: '₹', totalPattern: 'total', priceFormat: 'us' },
+  'www.amazon.com.br': { currency: 'BRL', symbol: 'R$', totalPattern: 'total', priceFormat: 'eu' },
+  'www.amazon.nl': { currency: 'EUR', symbol: '€', totalPattern: 'total|totaal', priceFormat: 'eu' },
+  'www.amazon.se': { currency: 'SEK', symbol: 'kr', totalPattern: 'total|summa', priceFormat: 'eu' },
+  'www.amazon.pl': { currency: 'PLN', symbol: 'zł', totalPattern: 'total|suma|łącznie', priceFormat: 'eu' },
+  'www.amazon.sg': { currency: 'SGD', symbol: 'S$', totalPattern: 'total', priceFormat: 'us' },
+  'www.amazon.com.mx': { currency: 'MXN', symbol: 'MX$', totalPattern: 'total|importe', priceFormat: 'us' },
+  'www.amazon.ae': { currency: 'AED', symbol: 'AED', totalPattern: 'total', priceFormat: 'us' },
+  'www.amazon.sa': { currency: 'SAR', symbol: 'SAR', totalPattern: 'total|الإجمالي', priceFormat: 'us' },
+  'www.amazon.com.tr': { currency: 'TRY', symbol: '₺', totalPattern: 'total|toplam', priceFormat: 'eu' },
+  'www.amazon.eg': { currency: 'EGP', symbol: 'EGP', totalPattern: 'total|الإجمالي', priceFormat: 'us' },
+  'www.amazon.com.be': { currency: 'EUR', symbol: '€', totalPattern: 'total|totaal|totale', priceFormat: 'eu' },
+};
+
+const AMAZON_MATCH_PATTERNS = Object.keys(AMAZON_DOMAINS).map(d => `https://${d}/*`);
+
+function getAmazonDomainConfig(hostname) {
+  return AMAZON_DOMAINS[hostname] || AMAZON_DOMAINS['www.amazon.com'];
+}
+
+function getCurrentDomainConfig() {
+  return getAmazonDomainConfig(window.location.hostname);
+}

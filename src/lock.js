@@ -99,7 +99,7 @@ function showLockOverlay(settings, spendingData) {
       spendingInfo = `
         <div style="margin-top:50px; text-align:center;">
           <div style="font-size:clamp(12px, 2vw, 16px); color:#ff9900; margin-bottom:16px;">You have spent</div>
-          <div style="font-size:clamp(28px, 7vw, 56px); font-weight:700; color:#ff9900; line-height:1;">${amount} €</div>
+          <div style="font-size:clamp(28px, 7vw, 56px); font-weight:700; color:#ff9900; line-height:1;">${amount} ${getCurrentDomainConfig().symbol}</div>
           <div style="font-size:clamp(12px, 2vw, 15px); color:#a0a0a0; margin-top:12px;">${rangeLabel}</div>
         </div>
       `;

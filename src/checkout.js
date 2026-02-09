@@ -23,7 +23,7 @@ function injectCheckoutAlert(spendingAmount, rangeLabel) {
 
   alertDiv.innerHTML = `
     <span style="font-size: 20px; line-height: 1;">⚠️</span>
-    <span style="flex: 1;">Are you sure you want to proceed? ${rangeLabel} you have already spent <strong>${Math.round(spendingAmount)}€</strong></span>
+    <span style="flex: 1;">Are you sure you want to proceed? ${rangeLabel} you have already spent <strong>${Math.round(spendingAmount)} ${getCurrentDomainConfig().symbol}</strong></span>
     <button id="amz-checkout-alert-close" style="background: none; border: none; cursor: pointer; padding: 0; margin: 0; line-height: 1; color: #5d4037; font-size: 18px; opacity: 0.7;" title="Close">×</button>
   `;
 

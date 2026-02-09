@@ -13,7 +13,27 @@
         "scripting"
     ],
     "host_permissions": [
-        "https://www.amazon.it/*"
+        "https://www.amazon.com/*",
+        "https://www.amazon.co.uk/*",
+        "https://www.amazon.de/*",
+        "https://www.amazon.fr/*",
+        "https://www.amazon.it/*",
+        "https://www.amazon.es/*",
+        "https://www.amazon.co.jp/*",
+        "https://www.amazon.ca/*",
+        "https://www.amazon.com.au/*",
+        "https://www.amazon.in/*",
+        "https://www.amazon.com.br/*",
+        "https://www.amazon.nl/*",
+        "https://www.amazon.se/*",
+        "https://www.amazon.pl/*",
+        "https://www.amazon.sg/*",
+        "https://www.amazon.com.mx/*",
+        "https://www.amazon.ae/*",
+        "https://www.amazon.sa/*",
+        "https://www.amazon.com.tr/*",
+        "https://www.amazon.eg/*",
+        "https://www.amazon.com.be/*"
     ],
     "background": {
         "service_worker": "background.js"
@@ -21,7 +41,27 @@
     "content_scripts": [
         {
             "matches": [
-                "https://www.amazon.it/*"
+                "https://www.amazon.com/*",
+                "https://www.amazon.co.uk/*",
+                "https://www.amazon.de/*",
+                "https://www.amazon.fr/*",
+                "https://www.amazon.it/*",
+                "https://www.amazon.es/*",
+                "https://www.amazon.co.jp/*",
+                "https://www.amazon.ca/*",
+                "https://www.amazon.com.au/*",
+                "https://www.amazon.in/*",
+                "https://www.amazon.com.br/*",
+                "https://www.amazon.nl/*",
+                "https://www.amazon.se/*",
+                "https://www.amazon.pl/*",
+                "https://www.amazon.sg/*",
+                "https://www.amazon.com.mx/*",
+                "https://www.amazon.ae/*",
+                "https://www.amazon.sa/*",
+                "https://www.amazon.com.tr/*",
+                "https://www.amazon.eg/*",
+                "https://www.amazon.com.be/*"
             ],
             "js": [
                 "src/constants.js",
@@ -46,7 +86,27 @@
                 "assets/images/icons/amz_icon.png"
             ],
             "matches": [
-                "https://www.amazon.it/*"
+                "https://www.amazon.com/*",
+                "https://www.amazon.co.uk/*",
+                "https://www.amazon.de/*",
+                "https://www.amazon.fr/*",
+                "https://www.amazon.it/*",
+                "https://www.amazon.es/*",
+                "https://www.amazon.co.jp/*",
+                "https://www.amazon.ca/*",
+                "https://www.amazon.com.au/*",
+                "https://www.amazon.in/*",
+                "https://www.amazon.com.br/*",
+                "https://www.amazon.nl/*",
+                "https://www.amazon.se/*",
+                "https://www.amazon.pl/*",
+                "https://www.amazon.sg/*",
+                "https://www.amazon.com.mx/*",
+                "https://www.amazon.ae/*",
+                "https://www.amazon.sa/*",
+                "https://www.amazon.com.tr/*",
+                "https://www.amazon.eg/*",
+                "https://www.amazon.com.be/*"
             ]
         }
     ]

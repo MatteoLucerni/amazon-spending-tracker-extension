@@ -127,7 +127,7 @@ function injectDemoPopup() {
       <div id="amz-range-30">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="color:#565959;">Last 30 days:</span>
-          <b style="color:#B12704; font-size:14px;">-- €</b>
+          <b style="color:#B12704; font-size:14px;">-- ${getCurrentDomainConfig().symbol}</b>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="font-size:11px; color:#767676;">- orders</span>
@@ -137,7 +137,7 @@ function injectDemoPopup() {
       <div id="amz-range-3m" style="border-top:1px solid #e7e7e7; padding-top:4px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="color:#565959;">Last 3 months:</span>
-          <b style="color:#B12704; font-size:14px;">-- €</b>
+          <b style="color:#B12704; font-size:14px;">-- ${getCurrentDomainConfig().symbol}</b>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="font-size:11px; color:#767676;">- orders</span>
