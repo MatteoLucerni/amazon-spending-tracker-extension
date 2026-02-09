@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/amazon-spending-tracker/ebpikpmmnpjmlcpanakfcgchkdjaanmm">
-    <img src="https://img.shields.io/chrome-web-store/v/ebpikpmmnpjmlcpanakfcgchkdjaanmm?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white&color=4285F4" alt="Chrome Web Store">
+  <a href="https://chromewebstore.google.com/detail/amazon-spending-tracker/jkdbmbhaikmkjkkjcppobcljbmofifbo">
+    <img src="https://img.shields.io/chrome-web-store/v/jkdbmbhaikmkjkkjcppobcljbmofifbo?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white&color=4285F4" alt="Chrome Web Store">
   </a>
-  <a href="https://chromewebstore.google.com/detail/amazon-spending-tracker/ebpikpmmnpjmlcpanakfcgchkdjaanmm">
-    <img src="https://img.shields.io/chrome-web-store/users/ebpikpmmnpjmlcpanakfcgchkdjaanmm?label=Users&logo=googlechrome&logoColor=white&color=34A853" alt="Chrome Web Store Users">
+  <a href="https://chromewebstore.google.com/detail/amazon-spending-tracker/jkdbmbhaikmkjkkjcppobcljbmofifbo">
+    <img src="https://img.shields.io/chrome-web-store/users/jkdbmbhaikmkjkkjcppobcljbmofifbo?label=Users&logo=googlechrome&logoColor=white&color=34A853" alt="Chrome Web Store Users">
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
@@ -131,7 +131,7 @@ The extension supports **21 Amazon regional domains** with localized price parsi
 
 ### From the Chrome Web Store
 
-1. Visit the [Chrome Web Store listing](https://chromewebstore.google.com/detail/amazon-spending-tracker/ebpikpmmnpjmlcpanakfcgchkdjaanmm)
+1. Visit the [Chrome Web Store listing](https://chromewebstore.google.com/detail/amazon-spending-tracker/jkdbmbhaikmkjkkjcppobcljbmofifbo)
 2. Click **"Add to Chrome"**
 3. Navigate to any Amazon page. The spending widget appears automatically
 
@@ -184,6 +184,8 @@ The scraping tab URL includes a `_scraping=1` parameter so the extension's conte
 amazon-spending-tracker-extension/
 ├── manifest.json              # Extension manifest (Manifest V3)
 ├── background.js              # Service worker: scraping, caching, message routing
+├── build.ps1                  # PowerShell packaging script for Chrome Web Store
+├── .gitignore                 # Git ignore rules (dist/, *.zip, OS files)
 ├── src/
 │   ├── main.js                # Entry point: init, routing (lock/checkout/normal)
 │   ├── constants.js           # Shared constants, SVG icons, domain configs
@@ -201,6 +203,8 @@ amazon-spending-tracker-extension/
 │   └── images/
 │       └── icons/
 │           └── amz_icon.png   # Extension icon (16/48/128px)
+├── dist/                      # Build output (git-ignored)
+│   └── *.zip                  # Packaged extension zips for Chrome Web Store
 └── docs/
     ├── index.html             # GitHub Pages landing page
     ├── css/
@@ -250,7 +254,7 @@ Your spending data never leaves your machine. Period.
 | ----------------- | ------------------------------------------------------------------------------------------------------- |
 | **Language**      | Vanilla JavaScript (ES6+)                                                                               |
 | **Extension API** | Chrome Extension Manifest V3                                                                            |
-| **Build Process** | None. Plain JS, no bundler, no transpiler                                                               |
+| **Build Process** | No bundler or transpiler. PowerShell packaging script (`build.ps1`) for Chrome Web Store zip            |
 | **Dependencies**  | Zero. No `node_modules`, no `package.json`                                                              |
 | **CSS**           | Injected programmatically via JavaScript                                                                |
 | **Hosting**       | GitHub Pages for the [landing page](https://matteolucerni.github.io/amazon-spending-tracker-extension/) |
@@ -270,6 +274,25 @@ Your spending data never leaves your machine. Period.
 | `chrome.tabs.remove`             | Clean up scraping tabs after data extraction           |
 | `chrome.tabs.onUpdated`          | Detect when scraping tabs finish loading               |
 | `chrome.scripting.executeScript` | Inject parsing scripts into order pages                |
+
+---
+
+## Packaging for Chrome Web Store
+
+To create a `.zip` ready for upload to the Chrome Web Store:
+
+```powershell
+.\build.ps1
+```
+
+The script:
+
+- Reads `short_name` and `version` from `manifest.json`
+- Collects all extension files dynamically (service worker, content scripts, icons, web accessible resources)
+- Creates a zip in `dist/` named `{short_name}-{version}-{timestamp}.zip` (e.g. `SpendGuard-1.0.0-20260209-153045.zip`)
+- Excludes non-extension files (`docs/`, `README.md`, `.git/`, `build.ps1`)
+
+> **Requirements:** PowerShell 5.1+ (built into Windows). No additional dependencies needed.
 
 ---
 
