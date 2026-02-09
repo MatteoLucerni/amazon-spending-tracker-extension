@@ -264,7 +264,8 @@ function injectPopup(data) {
     baseStyle.width = 'auto';
     baseStyle.bottom = '10px';
   } else {
-    applyPosition(baseStyle, savedState.position);
+    const estimatedHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 24;
+    applyPosition(baseStyle, savedState.position, estimatedHeight, rc.popupMinWidth);
   }
   Object.assign(popup.style, baseStyle);
 
@@ -363,6 +364,19 @@ function injectPopup(data) {
   document.body.appendChild(popup);
   if (isFirstAppearance) popup.classList.add('amz-popup-enter');
 
+  if (rc.tier !== 'mobile' && popup.style.left) {
+    const actualWidth = popup.offsetWidth;
+    const actualHeight = popup.offsetHeight;
+    const corrected = constrainToViewport(
+      parseFloat(popup.style.left),
+      parseFloat(popup.style.top),
+      actualHeight,
+      actualWidth,
+    );
+    popup.style.left = corrected.left + 'px';
+    popup.style.top = corrected.top + 'px';
+  }
+
   document.getElementById('amz-close').onclick = () => showMinimizedIcon();
   document.getElementById('amz-settings').onclick = () => showSettingsView();
   document.getElementById('amz-refresh-all').onclick = () => {
@@ -422,7 +436,7 @@ function showErrorPopup(errorType) {
     baseStyle.width = 'auto';
     baseStyle.bottom = '10px';
   } else {
-    applyPosition(baseStyle, savedState.position);
+    applyPosition(baseStyle, savedState.position, 130, rc.popupMinWidth);
   }
   Object.assign(popup.style, baseStyle);
 
