@@ -235,7 +235,7 @@ const tourSteps = [
   {
     target: '#amz-refresh-all',
     title: 'Refreshing Data',
-    description: 'Click this to update your data. A few browser tabs may briefly open and close in the background — that\'s normal! It\'s how we read your orders.',
+    description: 'Click this to update your data. A few browser tabs may briefly open and close in the background, that\'s normal! It\'s how we read your orders.',
   },
   {
     target: '#amz-settings',
@@ -1100,7 +1100,7 @@ function showLoadingPopup() {
                 <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
                 <span>Reading your orders...</span>
             </div>
-            <div style="font-size:11px; color:#767676; line-height:1.4;">A few tabs may open briefly in the background — they'll close on their own!</div>
+            <div style="font-size:11px; color:#767676; line-height:1.4;">A few tabs may open briefly in the background, they'll close on their own!</div>
         </div>
     `;
 
@@ -1404,7 +1404,7 @@ function showErrorPopup(errorType) {
   if (errorType === 'TAB_CREATE_FAILED') {
     errorMessage = "Couldn't read your orders. Try closing some browser tabs and click Retry.";
   } else if (errorType === 'CONTEXT_INVALIDATED') {
-    errorMessage = 'Extension was updated — please refresh this page.';
+    errorMessage = 'Extension was updated, please refresh this page.';
     showRetry = false;
     extraButton = '<button id="amz-reload-page" style="background:#232f3e; color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:11px; min-height:32px;">Refresh Page</button>';
   } else if (errorType === 'AUTH_REQUIRED') {
