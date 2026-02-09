@@ -77,9 +77,9 @@ function showSettingsView() {
     mainRect = mainPopup.getBoundingClientRect();
   }
 
-  const currentPosition = getCurrentPopupPosition();
-  if (currentPosition) {
-    savePopupState(false, currentPosition);
+  const side = getPopupSide();
+  if (side) {
+    savePopupState(false, side);
   }
 
   const existing = document.getElementById(POPUP_ID);
@@ -112,7 +112,7 @@ function showSettingsView() {
     userSelect: 'none',
   };
 
-  applyPosition(baseStyle, savedState.position, settingsHeight, settingsWidth);
+  applyPosition(baseStyle, savedState.side);
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
@@ -185,30 +185,6 @@ function showSettingsView() {
 
   document.body.appendChild(popup);
 
-  const actualHeight = popup.offsetHeight;
-  const viewportHeight = document.documentElement.clientHeight;
-  const viewportWidth = document.documentElement.clientWidth;
-  const margin = 10;
-
-  if (mainRect) {
-    const viewportCenter = viewportWidth / 2;
-    const popupCenter = (mainRect.left + mainRect.right) / 2;
-    let newLeft = popupCenter < viewportCenter ? mainRect.left : mainRect.right - settingsWidth;
-    let newTop = mainRect.bottom - actualHeight;
-    newLeft = Math.max(margin, Math.min(newLeft, viewportWidth - settingsWidth - margin));
-    newTop = Math.max(margin, Math.min(newTop, viewportHeight - actualHeight - margin));
-    popup.style.left = newLeft + 'px';
-    popup.style.top = newTop + 'px';
-    popup.style.bottom = '';
-    popup.style.right = '';
-  } else if (popup.style.top) {
-    let currentTop = parseFloat(popup.style.top);
-    const maxTop = viewportHeight - actualHeight - margin;
-    if (currentTop > maxTop) {
-      popup.style.top = Math.max(margin, maxTop) + 'px';
-    }
-  }
-
   document.getElementById('amz-replay-tutorial').onclick = () => {
     popup.remove();
     chrome.storage.local.set({ 'amz-onboarding-completed': false });
@@ -229,19 +205,12 @@ function showSettingsView() {
 
     const settingsPopup = document.getElementById(POPUP_ID);
     if (settingsPopup) {
-      const settingsRect = settingsPopup.getBoundingClientRect();
-      const rc = getResponsiveConfig();
-      const enabledCount = (newSettings.show30Days ? 1 : 0) + (newSettings.show3Months ? 1 : 0);
-      const mainHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 24;
-      const mainWidth = rc.popupMinWidth;
+      const rect = settingsPopup.getBoundingClientRect();
       const viewportCenter = document.documentElement.clientWidth / 2;
-      const popupCenter = (settingsRect.left + settingsRect.right) / 2;
-      const adjustedLeft = popupCenter < viewportCenter
-        ? settingsRect.left
-        : settingsRect.right - mainWidth;
-      const adjustedTop = settingsRect.bottom - mainHeight;
+      const popupCenter = (rect.left + rect.right) / 2;
+      const side = popupCenter < viewportCenter ? 'left' : 'right';
       settingsPopup.remove();
-      savePopupState(false, { left: adjustedLeft, top: adjustedTop });
+      savePopupState(false, side);
     }
 
     loadData(true);
@@ -273,13 +242,6 @@ function showSettingsView() {
         () => {
           lockTimes.style.display = 'flex';
           saveCurrentSettings();
-          const popup = document.getElementById(POPUP_ID);
-          if (popup && popup.style.top) {
-            const rect = popup.getBoundingClientRect();
-            const corrected = constrainToViewport(rect.left, rect.top, popup.offsetHeight, popup.offsetWidth);
-            popup.style.top = corrected.top + 'px';
-            popup.style.left = corrected.left + 'px';
-          }
         },
         () => {
           lockCheckbox.checked = false;

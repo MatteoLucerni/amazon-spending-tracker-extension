@@ -4,11 +4,11 @@ let tourActive = false;
 let resizeDebounceTimer = null;
 let dragAbortController = null;
 
-function savePopupState(isMinimized, position = null) {
+function savePopupState(isMinimized, side = null) {
   const currentState = getPopupState();
   const state = {
     isMinimized,
-    position: position !== null ? position : currentState.position,
+    side: side !== null ? side : currentState.side,
   };
   localStorage.setItem('amz-popup-state', JSON.stringify(state));
 }
@@ -20,45 +20,31 @@ function getPopupState() {
       const parsed = JSON.parse(saved);
       return {
         isMinimized: Boolean(parsed.isMinimized),
-        position:
-          parsed.position &&
-          typeof parsed.position.left === 'number' &&
-          typeof parsed.position.top === 'number'
-            ? parsed.position
-            : null,
+        side: parsed.side === 'left' ? 'left' : 'right',
       };
     }
   } catch (e) {
     console.error('Tracker: Error reading popup state', e);
   }
-  return { isMinimized: false, position: null };
+  return { isMinimized: false, side: 'right' };
 }
 
-function getCurrentPopupPosition() {
+function getPopupSide() {
   const popup = document.getElementById(POPUP_ID);
   if (popup) {
     const rect = popup.getBoundingClientRect();
-    return { left: rect.left, top: rect.top };
+    const viewportCenter = document.documentElement.clientWidth / 2;
+    const popupCenter = (rect.left + rect.right) / 2;
+    return popupCenter < viewportCenter ? 'left' : 'right';
   }
   return null;
 }
 
-function applyPosition(styleObj, position, height = null, width = null) {
-  if (
-    position &&
-    typeof position.left === 'number' &&
-    typeof position.top === 'number'
-  ) {
-    const constrained = constrainToViewport(
-      position.left,
-      position.top,
-      height,
-      width,
-    );
-    styleObj.left = constrained.left + 'px';
-    styleObj.top = constrained.top + 'px';
+function applyPosition(styleObj, side) {
+  styleObj.bottom = '10px';
+  if (side === 'left') {
+    styleObj.left = '10px';
   } else {
-    styleObj.bottom = '10px';
     styleObj.right = '10px';
   }
 }
@@ -89,11 +75,16 @@ function resetPopupPosition() {
   const popup = document.getElementById(POPUP_ID);
   if (!popup) return;
 
+  const side = getPopupState().side;
   popup.style.left = '';
   popup.style.top = '';
+  popup.style.right = '';
   popup.style.bottom = '10px';
-  popup.style.right = '10px';
-  savePopupState(false, null);
+  if (side === 'left') {
+    popup.style.left = '10px';
+  } else {
+    popup.style.right = '10px';
+  }
 }
 
 window.addEventListener('resize', () => {

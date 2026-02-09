@@ -1,8 +1,6 @@
 function showMinimizedIcon() {
-  const currentPosition = getCurrentPopupPosition();
-  if (currentPosition) {
-    savePopupState(true, currentPosition);
-  }
+  const side = getPopupSide() || getPopupState().side;
+  savePopupState(true, side);
 
   const existing = document.getElementById(POPUP_ID);
   if (existing) existing.remove();
@@ -28,7 +26,6 @@ function showMinimizedIcon() {
   Object.assign(icon.style, {
     position: 'fixed',
     bottom: '10px',
-    right: '10px',
     zIndex: '2147483647',
     backgroundColor: '#232f3e',
     color: '#ffffff',
@@ -44,6 +41,13 @@ function showMinimizedIcon() {
     boxSizing: 'border-box',
     userSelect: 'none',
   });
+
+  const savedSide = getPopupState().side;
+  if (savedSide === 'left') {
+    icon.style.left = '10px';
+  } else {
+    icon.style.right = '10px';
+  }
 
   const noRangesEnabled = !settings.show30Days && !settings.show3Months;
 
@@ -125,7 +129,7 @@ function showLoadingPopup() {
     baseStyle.width = 'auto';
     baseStyle.bottom = '10px';
   } else {
-    applyPosition(baseStyle, savedState.position, 130);
+    applyPosition(baseStyle, savedState.side);
   }
   Object.assign(popup.style, baseStyle);
 
@@ -206,7 +210,10 @@ function setupDraggable(popup) {
   const dragEnd = () => {
     if (isDragging && hasDragged) {
       const rect = popup.getBoundingClientRect();
-      savePopupState(false, { left: rect.left, top: rect.top });
+      const viewportCenter = document.documentElement.clientWidth / 2;
+      const popupCenter = (rect.left + rect.right) / 2;
+      const side = popupCenter < viewportCenter ? 'left' : 'right';
+      savePopupState(false, side);
     }
     isDragging = false;
     hasDragged = false;
@@ -221,9 +228,9 @@ function injectPopup(data) {
   injectGlobalStyles();
   cachedSpendingData = data;
 
-  const currentPosition = getCurrentPopupPosition();
-  if (currentPosition) {
-    savePopupState(false, currentPosition);
+  const side = getPopupSide();
+  if (side) {
+    savePopupState(false, side);
   }
 
   const existing = document.getElementById(POPUP_ID);
@@ -264,8 +271,7 @@ function injectPopup(data) {
     baseStyle.width = 'auto';
     baseStyle.bottom = '10px';
   } else {
-    const estimatedHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 24;
-    applyPosition(baseStyle, savedState.position, estimatedHeight, rc.popupMinWidth);
+    applyPosition(baseStyle, savedState.side);
   }
   Object.assign(popup.style, baseStyle);
 
@@ -364,19 +370,6 @@ function injectPopup(data) {
   document.body.appendChild(popup);
   if (isFirstAppearance) popup.classList.add('amz-popup-enter');
 
-  if (rc.tier !== 'mobile' && popup.style.left) {
-    const actualWidth = popup.offsetWidth;
-    const actualHeight = popup.offsetHeight;
-    const corrected = constrainToViewport(
-      parseFloat(popup.style.left),
-      parseFloat(popup.style.top),
-      actualHeight,
-      actualWidth,
-    );
-    popup.style.left = corrected.left + 'px';
-    popup.style.top = corrected.top + 'px';
-  }
-
   document.getElementById('amz-close').onclick = () => showMinimizedIcon();
   document.getElementById('amz-settings').onclick = () => showSettingsView();
   document.getElementById('amz-refresh-all').onclick = () => {
@@ -436,7 +429,7 @@ function showErrorPopup(errorType) {
     baseStyle.width = 'auto';
     baseStyle.bottom = '10px';
   } else {
-    applyPosition(baseStyle, savedState.position, 130, rc.popupMinWidth);
+    applyPosition(baseStyle, savedState.side);
   }
   Object.assign(popup.style, baseStyle);
 
