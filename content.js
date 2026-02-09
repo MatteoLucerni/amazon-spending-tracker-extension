@@ -2,6 +2,501 @@ let cachedSpendingData = {};
 let contextInvalidated = false;
 let isLoading30 = false;
 let isLoading3M = false;
+let tourActive = false;
+let resizeDebounceTimer = null;
+let dragAbortController = null;
+
+function getResponsiveConfig() {
+  const vw = document.documentElement.clientWidth;
+  if (vw <= 480) return { tier: 'mobile', popupWidth: vw - 20, settingsWidth: vw - 20, maxSettingsHeight: '70vh', draggable: false, tourTooltipMode: 'bottom-sheet', tourTooltipMaxWidth: vw - 32, welcomeMaxWidth: vw - 32, minIconSize: 44 };
+  if (vw <= 768) return { tier: 'tablet', popupWidth: Math.min(Math.max(140, vw * 0.22), 180), settingsWidth: 200, maxSettingsHeight: 'none', draggable: true, tourTooltipMode: 'positioned', tourTooltipMaxWidth: 280, welcomeMaxWidth: 400, minIconSize: 36 };
+  return { tier: 'desktop', popupWidth: 160, settingsWidth: 200, maxSettingsHeight: 'none', draggable: true, tourTooltipMode: 'positioned', tourTooltipMaxWidth: 320, welcomeMaxWidth: 400, minIconSize: 36 };
+}
+
+function injectGlobalStyles() {
+  if (document.getElementById('amz-tracker-global-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'amz-tracker-global-styles';
+  style.textContent = `
+    @keyframes amz-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes amz-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+    @keyframes amz-flash { 0% { background-color: rgba(255,153,0,0.3); } 100% { background-color: transparent; } }
+    @keyframes amz-slideIn { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: translateY(0); } }
+    @keyframes amz-slideOut { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(12px); } }
+    @keyframes amz-bounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-6px); } 60% { transform: translateY(-3px); } }
+    @keyframes amz-shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+    @keyframes amz-countdown-ring { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 113; } }
+    @keyframes amz-fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+    @keyframes amz-fadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }
+    .amz-refresh-spinning { animation: amz-spin 0.6s linear infinite; }
+    .amz-toggle-pulse { animation: amz-pulse 0.3s ease; }
+    .amz-data-flash { animation: amz-flash 0.8s ease; }
+    .amz-popup-enter { animation: amz-slideIn 0.25s ease-out; }
+    .amz-popup-exit { animation: amz-slideOut 0.2s ease-in forwards; }
+    .amz-icon-bounce { animation: amz-bounce 0.5s ease; }
+    .amz-skeleton-bar { height: 14px; border-radius: 3px; background: linear-gradient(90deg, #e7e7e7 25%, #f0f0f0 50%, #e7e7e7 75%); background-size: 200px 100%; animation: amz-shimmer 1.5s infinite; }
+
+    .amz-tour-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2147483646; pointer-events: none; }
+    .amz-tour-spotlight { position: fixed; z-index: 2147483646; border-radius: 6px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.7); pointer-events: none; transition: all 0.35s ease; }
+    .amz-tour-tooltip { position: fixed; z-index: 2147483647; background: #fff; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); font-family: Amazon Ember, Arial, sans-serif; pointer-events: auto; animation: amz-fadeIn 0.3s ease; }
+    .amz-tour-tooltip-mobile { position: fixed; bottom: 0; left: 0; right: 0; z-index: 2147483647; background: #fff; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.25); font-family: Amazon Ember, Arial, sans-serif; pointer-events: auto; animation: amz-slideIn 0.3s ease-out; }
+
+    .amz-welcome-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 2147483647; display: flex; justify-content: center; align-items: center; font-family: Amazon Ember, Arial, sans-serif; animation: amz-fadeIn 0.3s ease; }
+    .amz-welcome-card { background: #fff; border-radius: 12px; padding: 28px 24px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+    .amz-btn-primary { display: inline-block; padding: 10px 24px; border: none; border-radius: 6px; background: #FF9900; color: #0f1111; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.2s; }
+    .amz-btn-primary:hover { background: #e68a00; }
+    .amz-btn-secondary { display: inline-block; padding: 10px 24px; border: 1px solid #d5d9d9; border-radius: 6px; background: #fff; color: #565959; font-size: 14px; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+    .amz-btn-secondary:hover:not(:disabled) { background: #f7f7f7; }
+    .amz-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .amz-tour-dots { display: flex; gap: 6px; justify-content: center; }
+    .amz-tour-dot { width: 8px; height: 8px; border-radius: 50%; background: #d5d9d9; transition: background 0.2s; }
+    .amz-tour-dot-active { background: #FF9900; }
+
+    @media (max-width: 480px) {
+      .amz-welcome-card { padding: 20px 16px; margin: 0 16px; }
+      .amz-btn-primary, .amz-btn-secondary { padding: 12px 20px; min-height: 44px; font-size: 14px; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function showWelcomeGate(onStartTour, onSkip) {
+  injectGlobalStyles();
+  const rc = getResponsiveConfig();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'amz-welcome-overlay';
+  overlay.className = 'amz-welcome-overlay';
+
+  const iconUrl = chrome.runtime.getURL('assets/images/icons/amz_icon.png');
+
+  overlay.innerHTML = `
+    <div class="amz-welcome-card" style="max-width:${rc.welcomeMaxWidth}px; width:100%;">
+      <img src="${iconUrl}" alt="Amazon Spending Tracker" style="width:48px; height:48px; margin-bottom:16px;">
+      <h2 style="font-size:18px; font-weight:700; color:#0f1111; margin:0 0 8px 0;">Welcome to Amazon Spending Tracker!</h2>
+      <p style="font-size:13px; color:#565959; margin:0 0 24px 0; line-height:1.5;">This extension tracks your Amazon spending and helps you stay on budget. Would you like a quick guided tour?</p>
+      <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+        <button id="amz-welcome-start" class="amz-btn-primary" style="width:100%; max-width:220px;">Start Tutorial</button>
+        <button id="amz-welcome-skip" class="amz-btn-secondary" style="width:100%; max-width:220px;" disabled>
+          <span style="display:flex; align-items:center; justify-content:center; gap:8px;">
+            <svg id="amz-skip-ring" width="22" height="22" viewBox="0 0 40 40" style="flex-shrink:0;">
+              <circle cx="20" cy="20" r="18" fill="none" stroke="#d5d9d9" stroke-width="2.5"/>
+              <circle id="amz-skip-ring-progress" cx="20" cy="20" r="18" fill="none" stroke="#FF9900" stroke-width="2.5" stroke-dasharray="113" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 20 20)" style="animation: amz-countdown-ring 4s linear forwards;"/>
+              <text id="amz-skip-ring-num" x="20" y="24" text-anchor="middle" fill="#565959" font-size="14" font-weight="600">4</text>
+            </svg>
+            <span id="amz-skip-label">Skip in 4s</span>
+          </span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  let countdown = 4;
+  const skipBtn = document.getElementById('amz-welcome-skip');
+  const skipLabel = document.getElementById('amz-skip-label');
+  const ringNum = document.getElementById('amz-skip-ring-num');
+
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    if (countdown > 0) {
+      skipLabel.textContent = `Skip in ${countdown}s`;
+      ringNum.textContent = countdown;
+    } else {
+      clearInterval(countdownInterval);
+      skipBtn.disabled = false;
+      skipLabel.textContent = "Skip, I got it";
+      ringNum.textContent = '✓';
+      document.getElementById('amz-skip-ring-progress').style.animation = 'none';
+      document.getElementById('amz-skip-ring-progress').setAttribute('stroke-dashoffset', '113');
+    }
+  }, 1000);
+
+  document.getElementById('amz-welcome-start').onclick = () => {
+    clearInterval(countdownInterval);
+    overlay.remove();
+    onStartTour();
+  };
+
+  skipBtn.onclick = () => {
+    if (skipBtn.disabled) return;
+    clearInterval(countdownInterval);
+    overlay.remove();
+    onSkip();
+  };
+
+  const welcomeKeyHandler = (e) => {
+    if (e.key === 'Escape' && document.getElementById('amz-welcome-overlay')) {
+      if (!skipBtn.disabled) {
+        clearInterval(countdownInterval);
+        overlay.remove();
+        document.removeEventListener('keydown', welcomeKeyHandler);
+        onSkip();
+      }
+    }
+  };
+  document.addEventListener('keydown', welcomeKeyHandler);
+}
+
+function injectDemoPopup() {
+  const existing = document.getElementById('amz-spending-popup');
+  if (existing) existing.remove();
+
+  const rc = getResponsiveConfig();
+  const popup = document.createElement('div');
+  popup.id = 'amz-spending-popup';
+
+  const popupHeight = 164;
+  const baseStyle = {
+    position: 'fixed',
+    zIndex: '2147483645',
+    backgroundColor: '#ffffff',
+    color: '#0f1111',
+    padding: '0',
+    borderRadius: '8px',
+    boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
+    fontFamily: 'Amazon Ember, Arial, sans-serif',
+    width: rc.popupWidth + 'px',
+    height: popupHeight + 'px',
+    border: '1px solid #d5d9d9',
+    boxSizing: 'border-box',
+    userSelect: 'none',
+    overflow: 'hidden',
+    bottom: '10px',
+    right: '10px',
+  };
+
+  if (rc.tier === 'mobile') {
+    baseStyle.right = '10px';
+    baseStyle.left = '10px';
+    baseStyle.width = 'auto';
+  }
+
+  Object.assign(popup.style, baseStyle);
+
+  const refreshIcon = `<svg style="cursor:pointer; flex-shrink:0;" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#767676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Refresh</title><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+
+  popup.innerHTML = `
+    <style>@keyframes amz-spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+    <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
+      <span>Spendings</span>
+      <div id="amz-header-buttons" style="display:flex; align-items:center; gap:4px;">
+        <svg id="amz-refresh-all" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Refresh all</title><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        <svg id="amz-settings" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>Settings</title><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <svg id="amz-close" style="cursor:pointer; padding:0 2px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><title>Close</title><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>
+    <div id="amz-popup-body" style="padding:8px 8px 10px 8px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
+      <div id="amz-range-30">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:#565959;">Last 30 days:</span>
+          <b style="color:#B12704; font-size:14px;">-- €</b>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:11px; color:#767676;">- orders</span>
+          <span id="amz-refresh-30">${refreshIcon}</span>
+        </div>
+      </div>
+      <div id="amz-range-3m" style="border-top:1px solid #e7e7e7; padding-top:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:#565959;">Last 3 months:</span>
+          <b style="color:#B12704; font-size:14px;">-- €</b>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:11px; color:#767676;">- orders</span>
+          <span id="amz-refresh-3m">${refreshIcon}</span>
+        </div>
+      </div>
+      <div style="font-size:10px; color:#999; text-align:center; border-top:1px solid #e7e7e7; padding-top:3px">Lock not configured</div>
+    </div>
+  `;
+
+  document.body.appendChild(popup);
+}
+
+const tourSteps = [
+  {
+    target: null,
+    title: 'How It Works',
+    description: 'This extension automatically scans your Amazon orders and shows how much you\'ve spent recently. Here\'s a quick overview of what you\'ll see.',
+  },
+  {
+    target: '#amz-spending-popup',
+    title: 'Your Spending Panel',
+    description: 'This floating panel shows your Amazon spending. You can drag it anywhere on the page by grabbing the header bar.',
+  },
+  {
+    target: '#amz-popup-body',
+    title: 'Spending Breakdown',
+    description: 'See your spending for the last 30 days and 3 months. Each line shows the total amount, number of orders, and last update time.',
+  },
+  {
+    target: '#amz-refresh-all',
+    title: 'Refreshing Data',
+    description: 'Click this to update your data. A few browser tabs may briefly open and close in the background, that\'s normal! It\'s how we read your orders.',
+  },
+  {
+    target: '#amz-settings',
+    title: 'Settings',
+    description: 'Customize which time ranges to show. You can also set up an Interface Lock to block Amazon during certain hours and avoid impulse purchases.',
+  },
+  {
+    target: '#amz-close',
+    title: 'Minimize & Restore',
+    description: 'Close the panel to shrink it into a small icon in the corner. Click the icon anytime to bring it back.',
+  },
+];
+
+function startTour() {
+  tourActive = true;
+  injectGlobalStyles();
+  injectDemoPopup();
+
+  const spotlightEl = document.createElement('div');
+  spotlightEl.id = 'amz-tour-spotlight';
+  spotlightEl.className = 'amz-tour-spotlight';
+  spotlightEl.style.display = 'none';
+  document.body.appendChild(spotlightEl);
+
+  const backdropEl = document.createElement('div');
+  backdropEl.id = 'amz-tour-backdrop';
+  backdropEl.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483645;pointer-events:auto;';
+  backdropEl.style.display = 'none';
+  document.body.appendChild(backdropEl);
+
+  let currentStep = 0;
+
+  function showStep(index) {
+    currentStep = index;
+    const step = tourSteps[index];
+    const rc = getResponsiveConfig();
+
+    const oldTooltip = document.getElementById('amz-tour-tooltip');
+    if (oldTooltip) oldTooltip.remove();
+    const oldCenterOverlay = document.getElementById('amz-tour-center-overlay');
+    if (oldCenterOverlay) oldCenterOverlay.remove();
+
+    const popup = document.getElementById('amz-spending-popup');
+    if (popup) popup.style.zIndex = '2147483645';
+
+    if (!step.target) {
+      spotlightEl.style.display = 'none';
+      backdropEl.style.display = 'none';
+      showCenteredCard(step, index);
+      return;
+    }
+
+    const targetEl = document.querySelector(step.target);
+    if (!targetEl) {
+      if (index < tourSteps.length - 1) showStep(index + 1);
+      else endTour();
+      return;
+    }
+
+    const rect = targetEl.getBoundingClientRect();
+    const pad = 6;
+    Object.assign(spotlightEl.style, {
+      display: 'block',
+      left: (rect.left - pad) + 'px',
+      top: (rect.top - pad) + 'px',
+      width: (rect.width + pad * 2) + 'px',
+      height: (rect.height + pad * 2) + 'px',
+    });
+    backdropEl.style.display = 'block';
+
+    const tooltip = document.createElement('div');
+    tooltip.id = 'amz-tour-tooltip';
+
+    if (rc.tourTooltipMode === 'bottom-sheet') {
+      tooltip.className = 'amz-tour-tooltip-mobile';
+      tooltip.style.maxWidth = '100%';
+    } else {
+      tooltip.className = 'amz-tour-tooltip';
+      tooltip.style.maxWidth = rc.tourTooltipMaxWidth + 'px';
+    }
+
+    const dotsHtml = tourSteps.map((_, i) => `<div class="amz-tour-dot ${i === index ? 'amz-tour-dot-active' : ''}"></div>`).join('');
+
+    tooltip.innerHTML = `
+      <div style="padding:16px 18px;">
+        <div style="font-size:15px; font-weight:700; color:#0f1111; margin-bottom:6px;">${step.title}</div>
+        <p style="font-size:13px; color:#565959; line-height:1.5; margin:0 0 16px 0;">${step.description}</p>
+        <div class="amz-tour-dots" style="margin-bottom:12px;">${dotsHtml}</div>
+        <div style="font-size:11px; color:#999; text-align:center; margin-bottom:10px;">Step ${index + 1} of ${tourSteps.length}</div>
+        <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+          ${index > 0 ? '<button id="amz-tour-back" class="amz-btn-secondary" style="padding:8px 16px; font-size:13px; min-height:36px;">← Back</button>' : ''}
+          ${index < tourSteps.length - 1 ? '<button id="amz-tour-next" class="amz-btn-primary" style="padding:8px 16px; font-size:13px; min-height:36px;">Next →</button>' : '<button id="amz-tour-finish" class="amz-btn-primary" style="padding:8px 16px; font-size:13px; min-height:36px;">Got it!</button>'}
+          <button id="amz-tour-skip" style="background:none; border:none; color:#999; font-size:12px; cursor:pointer; padding:8px; font-family:inherit;">Skip Tour</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(tooltip);
+
+    if (rc.tourTooltipMode !== 'bottom-sheet') {
+      positionTooltip(tooltip, rect);
+    }
+
+    const backBtn = document.getElementById('amz-tour-back');
+    if (backBtn) backBtn.onclick = () => showStep(index - 1);
+    const nextBtn = document.getElementById('amz-tour-next');
+    if (nextBtn) nextBtn.onclick = () => showStep(index + 1);
+    const finishBtn = document.getElementById('amz-tour-finish');
+    if (finishBtn) finishBtn.onclick = () => endTour();
+    document.getElementById('amz-tour-skip').onclick = () => endTour();
+  }
+
+  function showCenteredCard(step, index) {
+    const rc = getResponsiveConfig();
+    const tooltip = document.createElement('div');
+    tooltip.id = 'amz-tour-tooltip';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'amz-tour-center-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:2147483646;display:flex;justify-content:center;align-items:center;animation:amz-fadeIn 0.3s ease;';
+
+    const dotsHtml = tourSteps.map((_, i) => `<div class="amz-tour-dot ${i === index ? 'amz-tour-dot-active' : ''}"></div>`).join('');
+    const iconUrl = chrome.runtime.getURL('assets/images/icons/amz_icon.png');
+
+    tooltip.style.cssText = `background:#fff; border-radius:12px; padding:24px 20px; text-align:center; max-width:${rc.tourTooltipMaxWidth}px; width:calc(100% - 32px); box-shadow:0 8px 32px rgba(0,0,0,0.3);`;
+    tooltip.innerHTML = `
+      <img src="${iconUrl}" alt="" style="width:40px; height:40px; margin-bottom:12px;">
+      <div style="font-size:16px; font-weight:700; color:#0f1111; margin-bottom:8px;">${step.title}</div>
+      <p style="font-size:13px; color:#565959; line-height:1.5; margin:0 0 16px 0;">${step.description}</p>
+      <div class="amz-tour-dots" style="margin-bottom:12px;">${dotsHtml}</div>
+      <div style="font-size:11px; color:#999; text-align:center; margin-bottom:10px;">Step ${index + 1} of ${tourSteps.length}</div>
+      <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+        ${index > 0 ? '<button id="amz-tour-back" class="amz-btn-secondary" style="padding:8px 16px; font-size:13px;">← Back</button>' : ''}
+        <button id="amz-tour-next" class="amz-btn-primary" style="padding:8px 16px; font-size:13px;">Next →</button>
+        <button id="amz-tour-skip" style="background:none; border:none; color:#999; font-size:12px; cursor:pointer; padding:8px; font-family:inherit;">Skip Tour</button>
+      </div>
+    `;
+
+    overlay.appendChild(tooltip);
+    document.body.appendChild(overlay);
+
+    const backBtn = document.getElementById('amz-tour-back');
+    if (backBtn) backBtn.onclick = () => { overlay.remove(); showStep(index - 1); };
+    document.getElementById('amz-tour-next').onclick = () => { overlay.remove(); showStep(index + 1); };
+    document.getElementById('amz-tour-skip').onclick = () => { overlay.remove(); endTour(); };
+  }
+
+  function positionTooltip(tooltip, targetRect) {
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const gap = 12;
+
+    const tw = tooltip.offsetWidth;
+    const th = tooltip.offsetHeight;
+
+    const spaceBelow = vh - targetRect.bottom - gap;
+    const spaceAbove = targetRect.top - gap;
+    const spaceRight = vw - targetRect.right - gap;
+    const spaceLeft = targetRect.left - gap;
+
+    let top, left;
+
+    if (spaceBelow >= th) {
+      top = targetRect.bottom + gap;
+      left = targetRect.left + (targetRect.width / 2) - (tw / 2);
+    } else if (spaceAbove >= th) {
+      top = targetRect.top - th - gap;
+      left = targetRect.left + (targetRect.width / 2) - (tw / 2);
+    } else if (spaceLeft >= tw) {
+      left = targetRect.left - tw - gap;
+      top = targetRect.top + (targetRect.height / 2) - (th / 2);
+    } else if (spaceRight >= tw) {
+      left = targetRect.right + gap;
+      top = targetRect.top + (targetRect.height / 2) - (th / 2);
+    } else {
+      top = Math.max(10, vh - th - 10);
+      left = Math.max(10, (vw - tw) / 2);
+    }
+
+    left = Math.max(10, Math.min(left, vw - tw - 10));
+    top = Math.max(10, Math.min(top, vh - th - 10));
+
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  }
+
+  function endTour() {
+    tourActive = false;
+    document.removeEventListener('keydown', handleKeyboard);
+    const spotlight = document.getElementById('amz-tour-spotlight');
+    if (spotlight) spotlight.remove();
+    const backdrop = document.getElementById('amz-tour-backdrop');
+    if (backdrop) backdrop.remove();
+    const tooltip = document.getElementById('amz-tour-tooltip');
+    if (tooltip) tooltip.remove();
+    const centerOverlay = document.getElementById('amz-tour-center-overlay');
+    if (centerOverlay) centerOverlay.remove();
+    const demoPopup = document.getElementById('amz-spending-popup');
+    if (demoPopup) demoPopup.remove();
+
+    chrome.storage.local.set({ 'amz-onboarding-completed': true });
+    loadData(true);
+  }
+
+  function handleKeyboard(e) {
+    if (!tourActive) {
+      document.removeEventListener('keydown', handleKeyboard);
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (currentStep < tourSteps.length - 1) showStep(currentStep + 1);
+      else endTour();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (currentStep > 0) showStep(currentStep - 1);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      const centerOverlay = document.getElementById('amz-tour-center-overlay');
+      if (centerOverlay) centerOverlay.remove();
+      endTour();
+    }
+  }
+
+  document.addEventListener('keydown', handleKeyboard);
+  showStep(0);
+}
+
+function checkOnboardingAndInit() {
+  if (window.location.href.includes('_scraping=1')) return;
+  if (window.location.href.includes('signin')) return;
+
+  const settings = getSettings();
+
+  if (isInLockTimeRange(settings)) {
+    loadSpendingDataForLock(spendingData => {
+      showLockOverlay(settings, spendingData);
+    });
+    return;
+  }
+
+  if (window.location.href.includes('checkout')) {
+    observeCheckoutPage();
+    return;
+  }
+
+  chrome.storage.local.get('amz-onboarding-completed', result => {
+    if (result['amz-onboarding-completed']) {
+      loadData(true);
+    } else {
+      injectGlobalStyles();
+      showWelcomeGate(
+        () => startTour(),
+        () => {
+          chrome.storage.local.set({ 'amz-onboarding-completed': true });
+          loadData(true);
+        }
+      );
+    }
+  });
+}
 
 // Safe wrapper for chrome.runtime.sendMessage to handle context invalidation
 function safeSendMessage(message, callback) {
@@ -22,6 +517,7 @@ function safeSendMessage(message, callback) {
         // Log as warning for non-critical errors like "message channel closed"
         if (errorMessage.includes('message channel closed')) {
           console.warn('[Amazon Tracker] sendMessage warning:', errorMessage);
+          if (callback) callback(null);
           return;
         }
         console.error('[Amazon Tracker] sendMessage error:', errorMessage);
@@ -108,14 +604,14 @@ function showLockConfirmDialog(onConfirm, onCancel) {
   });
 
   overlay.innerHTML = `
-    <div style="background:#fff; border-radius:8px; padding:20px; max-width:300px; box-shadow:0 4px 12px rgba(0,0,0,0.3); text-align:center;">
+    <div style="background:#fff; border-radius:8px; padding:20px; max-width:min(300px, calc(100vw - 40px)); box-shadow:0 4px 12px rgba(0,0,0,0.3); text-align:center;">
       <div style="font-size:16px; font-weight:600; color:#0f1111; margin-bottom:12px;">Enable Interface Lock?</div>
       <p style="font-size:13px; color:#565959; margin:0 0 20px 0; line-height:1.4;">
         This will block your access to Amazon during the scheduled time. <strong style="color:#0f1111;">You won't be able to change this setting while locked.</strong>
       </p>
       <div style="display:flex; gap:10px; justify-content:center;">
-        <button id="amz-lock-cancel" style="padding:8px 16px; border:1px solid #d5d9d9; border-radius:4px; background:#fff; color:#0f1111; font-size:13px; cursor:pointer;">Cancel</button>
-        <button id="amz-lock-confirm" style="padding:8px 16px; border:none; border-radius:4px; background:#999; color:#fff; font-size:13px; cursor:not-allowed;" disabled>Enable (3)</button>
+        <button id="amz-lock-cancel" style="padding:8px 16px; border:1px solid #d5d9d9; border-radius:4px; background:#fff; color:#0f1111; font-size:13px; cursor:pointer; min-height:44px;">Cancel</button>
+        <button id="amz-lock-confirm" style="padding:8px 16px; border:none; border-radius:4px; background:#999; color:#fff; font-size:13px; cursor:not-allowed; min-height:44px;" disabled>Enable (3)</button>
       </div>
     </div>
   `;
@@ -151,9 +647,9 @@ function showLockConfirmDialog(onConfirm, onCancel) {
     if (onConfirm) onConfirm();
   };
 
-  // Close on overlay click
   overlay.onclick = (e) => {
     if (e.target === overlay) {
+      clearInterval(countdownInterval);
       overlay.remove();
       if (onCancel) onCancel();
     }
@@ -161,6 +657,12 @@ function showLockConfirmDialog(onConfirm, onCancel) {
 }
 
 function showSettingsView() {
+  const mainPopup = document.getElementById('amz-spending-popup');
+  let mainRect = null;
+  if (mainPopup) {
+    mainRect = mainPopup.getBoundingClientRect();
+  }
+
   const currentPosition = getCurrentPopupPosition();
   if (currentPosition) {
     savePopupState(false, currentPosition);
@@ -174,8 +676,9 @@ function showSettingsView() {
   const popup = document.createElement('div');
   popup.id = 'amz-spending-popup';
 
-  const settingsWidth = 200;
-  const settingsHeight = 235;
+  const rc = getResponsiveConfig();
+  const settingsWidth = rc.settingsWidth;
+  const settingsHeight = 270;
 
   const baseStyle = {
     position: 'fixed',
@@ -187,7 +690,9 @@ function showSettingsView() {
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
     width: settingsWidth + 'px',
-    height: settingsHeight + 'px',
+    height: 'auto',
+    maxHeight: rc.maxSettingsHeight,
+    overflow: 'hidden',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
@@ -256,17 +761,76 @@ function showSettingsView() {
           </div>
         </div>
       </div>
+      <div style="border-top:1px solid #e7e7e7; margin-top:4px; padding-top:8px;">
+        <button id="amz-replay-tutorial" style="display:flex; align-items:center; justify-content:center; gap:6px; width:100%; padding:6px 0; border:1px solid #d5d9d9; border-radius:4px; background:#fff; color:#565959; font-size:11px; cursor:pointer; font-family:inherit; transition:background 0.2s;" onmouseover="this.style.background='#f7f7f7'" onmouseout="this.style.background='#fff'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><text x="12" y="16" text-anchor="middle" fill="currentColor" stroke="none" font-size="12" font-weight="600">?</text></svg>
+          Replay Tutorial
+        </button>
+      </div>
     </div>
   `;
 
   document.body.appendChild(popup);
 
+  const actualHeight = popup.offsetHeight;
+  const viewportHeight = document.documentElement.clientHeight;
+  const viewportWidth = document.documentElement.clientWidth;
+  const margin = 10;
+
+  if (mainRect) {
+    const viewportCenter = viewportWidth / 2;
+    const popupCenter = (mainRect.left + mainRect.right) / 2;
+    let newLeft = popupCenter < viewportCenter ? mainRect.left : mainRect.right - settingsWidth;
+    let newTop = mainRect.bottom - actualHeight;
+    newLeft = Math.max(margin, Math.min(newLeft, viewportWidth - settingsWidth - margin));
+    newTop = Math.max(margin, Math.min(newTop, viewportHeight - actualHeight - margin));
+    popup.style.left = newLeft + 'px';
+    popup.style.top = newTop + 'px';
+    popup.style.bottom = '';
+    popup.style.right = '';
+  } else if (popup.style.top) {
+    let currentTop = parseFloat(popup.style.top);
+    const maxTop = viewportHeight - actualHeight - margin;
+    if (currentTop > maxTop) {
+      popup.style.top = Math.max(margin, maxTop) + 'px';
+    }
+  }
+
+  document.getElementById('amz-replay-tutorial').onclick = () => {
+    popup.remove();
+    chrome.storage.local.set({ 'amz-onboarding-completed': false });
+    injectGlobalStyles();
+    showWelcomeGate(
+      () => startTour(),
+      () => {
+        chrome.storage.local.set({ 'amz-onboarding-completed': true });
+        loadData(true);
+      }
+    );
+  };
+
   document.getElementById('amz-close').onclick = () => showMinimizedIcon();
   document.getElementById('amz-back').onclick = () => {
-    // Save all settings before going back
     const newSettings = getCurrentSettingsFromForm();
     saveSettings(newSettings);
-    // Load data (will fetch missing ranges if newly enabled)
+
+    const settingsPopup = document.getElementById('amz-spending-popup');
+    if (settingsPopup) {
+      const settingsRect = settingsPopup.getBoundingClientRect();
+      const rc = getResponsiveConfig();
+      const enabledCount = (newSettings.show30Days ? 1 : 0) + (newSettings.show3Months ? 1 : 0);
+      const mainHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 24;
+      const mainWidth = rc.popupWidth;
+      const viewportCenter = document.documentElement.clientWidth / 2;
+      const popupCenter = (settingsRect.left + settingsRect.right) / 2;
+      const adjustedLeft = popupCenter < viewportCenter
+        ? settingsRect.left
+        : settingsRect.right - mainWidth;
+      const adjustedTop = settingsRect.bottom - mainHeight;
+      settingsPopup.remove();
+      savePopupState(false, { left: adjustedLeft, top: adjustedTop });
+    }
+
     loadData(true);
   };
 
@@ -421,8 +985,12 @@ function resetPopupPosition() {
   savePopupState(false, null);
 }
 
-// Listen for viewport resize
-window.addEventListener('resize', resetPopupPosition);
+window.addEventListener('resize', () => {
+  clearTimeout(resizeDebounceTimer);
+  resizeDebounceTimer = setTimeout(() => {
+    resetPopupPosition();
+  }, 300);
+});
 
 function showMinimizedIcon() {
   // Save current position before removing the popup (for when it reopens)
@@ -519,19 +1087,19 @@ function showMinimizedIcon() {
   }
 
   icon.onclick = () => {
-    if (cachedSpendingData) {
-      injectPopup(cachedSpendingData);
-    }
+    injectPopup(cachedSpendingData || {});
   };
 
   document.body.appendChild(icon);
 }
 
 function showLoadingPopup() {
+  injectGlobalStyles();
   const existing = document.getElementById('amz-spending-popup');
   if (existing) existing.remove();
 
   const savedState = getPopupState();
+  const rc = getResponsiveConfig();
   const popup = document.createElement('div');
   popup.id = 'amz-spending-popup';
 
@@ -544,14 +1112,21 @@ function showLoadingPopup() {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '160px',
+    width: rc.popupWidth + 'px',
     height: '130px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
   };
 
-  applyPosition(baseStyle, savedState.position, 130);
+  if (rc.tier === 'mobile') {
+    baseStyle.left = '10px';
+    baseStyle.right = '10px';
+    baseStyle.width = 'auto';
+    baseStyle.bottom = '10px';
+  } else {
+    applyPosition(baseStyle, savedState.position, 130);
+  }
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
@@ -571,9 +1146,9 @@ function showLoadingPopup() {
         <div style="padding:8px; font-size:12px; color:#565959; line-height:1.3;">
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
                 <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
-                <span>Loading spending data...</span>
+                <span>Reading your orders...</span>
             </div>
-            <div style="font-size:12px; color:#767676;">Tabs may open automatically</div>
+            <div style="font-size:11px; color:#767676; line-height:1.4;">A few tabs may open briefly in the background, they'll close on their own!</div>
         </div>
     `;
 
@@ -587,6 +1162,10 @@ function showLoadingPopup() {
 }
 
 function setupDraggable(popup) {
+  if (dragAbortController) dragAbortController.abort();
+  dragAbortController = new AbortController();
+  const signal = dragAbortController.signal;
+
   let isDragging = false;
   let hasDragged = false;
   let offsetX = 0;
@@ -595,14 +1174,14 @@ function setupDraggable(popup) {
   const dragHandle = document.getElementById('amz-drag-handle');
   if (!dragHandle) return;
 
+  const headerBtnIds = ['amz-close', 'amz-settings', 'amz-back', 'amz-refresh-all'];
   const dragStart = e => {
     if (e.target === dragHandle || dragHandle.contains(e.target)) {
-      if (
-        e.target.id === 'amz-close' ||
-        e.target.id === 'amz-settings' ||
-        e.target.id === 'amz-back'
-      )
-        return; // Don't drag when clicking buttons
+      const isHeaderButton = headerBtnIds.some(id => {
+        const el = document.getElementById(id);
+        return el && (el === e.target || el.contains(e.target));
+      });
+      if (isHeaderButton) return;
       isDragging = true;
       hasDragged = false;
       const rect = popup.getBoundingClientRect();
@@ -639,12 +1218,13 @@ function setupDraggable(popup) {
     hasDragged = false;
   };
 
-  dragHandle.addEventListener('mousedown', dragStart);
-  document.addEventListener('mousemove', drag);
-  document.addEventListener('mouseup', dragEnd);
+  dragHandle.addEventListener('mousedown', dragStart, { signal });
+  document.addEventListener('mousemove', drag, { signal });
+  document.addEventListener('mouseup', dragEnd, { signal });
 }
 
 function injectPopup(data) {
+  injectGlobalStyles();
   cachedSpendingData = data;
 
   // CRITICAL: Save current position BEFORE removing the popup
@@ -664,6 +1244,7 @@ function injectPopup(data) {
   // Calculate height based on enabled ranges (add extra height for lock status)
   const enabledCount =
     (settings.show30Days ? 1 : 0) + (settings.show3Months ? 1 : 0);
+  const rc = getResponsiveConfig();
   const popupHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 24;
 
   const baseStyle = {
@@ -675,7 +1256,7 @@ function injectPopup(data) {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '160px',
+    width: rc.popupWidth + 'px',
     height: popupHeight + 'px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
@@ -683,7 +1264,14 @@ function injectPopup(data) {
     overflow: 'hidden',
   };
 
-  applyPosition(baseStyle, savedState.position, popupHeight);
+  if (rc.tier === 'mobile') {
+    baseStyle.left = '10px';
+    baseStyle.right = '10px';
+    baseStyle.width = 'auto';
+    baseStyle.bottom = '10px';
+  } else {
+    applyPosition(baseStyle, savedState.position, popupHeight);
+  }
   Object.assign(popup.style, baseStyle);
 
   const is30DaysLoading = data.total === undefined;
@@ -707,11 +1295,11 @@ function injectPopup(data) {
     const time30 = data.updatedAt30 ? formatRelativeTime(data.updatedAt30) : '';
     thirtyDaysContent = is30DaysLoading
       ? `<div>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
-            <span style="color:#565959;">Loading 30 days...</span>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#565959;">Last 30 days:</span>
+            <div class="amz-skeleton-bar" style="width:50px; height:14px;"></div>
           </div>
-          <div style="font-size:10px; color:#999; margin-left:18px;">Tabs may auto-open</div>
+          <div style="margin-top:4px;"><div class="amz-skeleton-bar" style="width:80px; height:10px;"></div></div>
         </div>`
       : `<div>
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -734,11 +1322,11 @@ function injectPopup(data) {
       : '';
     const innerContent = is3MonthsLoading
       ? `<div>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <div style="width:12px; height:12px; border:2px solid #e7e7e7; border-top:2px solid #232f3e; border-radius:50%; animation:amz-spinner 0.8s linear infinite;"></div>
-            <span style="color:#565959;">Loading 3 months...</span>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:#565959;">Last 3 months:</span>
+            <div class="amz-skeleton-bar" style="width:50px; height:14px;"></div>
           </div>
-          <div style="font-size:10px; color:#999; margin-left:18px;">Tabs may auto-open</div>
+          <div style="margin-top:4px;"><div class="amz-skeleton-bar" style="width:80px; height:10px;"></div></div>
         </div>`
       : `<div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="color:#565959;">Last 3 months:</span>
@@ -755,7 +1343,11 @@ function injectPopup(data) {
   const gearIcon = `<svg style="vertical-align: middle; margin: 0 2px;" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
   const noRangesMessage =
     enabledCount === 0
-      ? `<div style="color:#565959; text-align:center; line-height: 1.4;">No ranges enabled, click on ${gearIcon} to enable a range</div>`
+      ? `<div style="color:#565959; text-align:center; line-height: 1.4;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d5d9d9" stroke-width="1.5" style="margin-bottom:4px;"><path d="M3 3l18 18M21 12a9 9 0 0 1-1.5 5M3.6 15A9 9 0 0 1 12 3a9 9 0 0 1 5 1.5"/></svg>
+          <div style="font-size:12px; margin-bottom:4px;">No spending ranges selected</div>
+          <span id="amz-open-settings-link" style="color:#0066c0; font-size:11px; cursor:pointer; text-decoration:underline;">Open Settings</span>
+        </div>`
       : '';
 
   // Lock status message
@@ -786,11 +1378,21 @@ function injectPopup(data) {
         </div>
     `;
 
+  const isFirstAppearance = !existing;
   document.body.appendChild(popup);
+  if (isFirstAppearance) popup.classList.add('amz-popup-enter');
 
   document.getElementById('amz-close').onclick = () => showMinimizedIcon();
   document.getElementById('amz-settings').onclick = () => showSettingsView();
-  document.getElementById('amz-refresh-all').onclick = () => refreshAll();
+  document.getElementById('amz-refresh-all').onclick = () => {
+    const refreshIcon = document.getElementById('amz-refresh-all');
+    if (refreshIcon) refreshIcon.classList.add('amz-refresh-spinning');
+    refreshAll();
+  };
+  const openSettingsLink = document.getElementById('amz-open-settings-link');
+  if (openSettingsLink) {
+    openSettingsLink.onclick = () => showSettingsView();
+  }
 
   // Refresh handlers
   const refresh30Btn = document.getElementById('amz-refresh-30');
@@ -808,10 +1410,12 @@ function injectPopup(data) {
 
 // Show error message in popup
 function showErrorPopup(errorType) {
+  injectGlobalStyles();
   const existing = document.getElementById('amz-spending-popup');
   if (existing) existing.remove();
 
   const savedState = getPopupState();
+  const rc = getResponsiveConfig();
   const popup = document.createElement('div');
   popup.id = 'amz-spending-popup';
 
@@ -824,23 +1428,37 @@ function showErrorPopup(errorType) {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '160px',
-    height: '130px',
+    width: rc.popupWidth + 'px',
+    minHeight: '130px',
+    height: 'auto',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
   };
 
-  applyPosition(baseStyle, savedState.position, 130);
+  if (rc.tier === 'mobile') {
+    baseStyle.left = '10px';
+    baseStyle.right = '10px';
+    baseStyle.width = 'auto';
+    baseStyle.bottom = '10px';
+  } else {
+    applyPosition(baseStyle, savedState.position, 130);
+  }
   Object.assign(popup.style, baseStyle);
 
   let errorMessage;
   let showRetry = true;
+  let extraButton = '';
   if (errorType === 'TAB_CREATE_FAILED') {
-    errorMessage = 'Could not open tabs. Please try again.';
+    errorMessage = "Couldn't read your orders. Try closing some browser tabs and click Retry.";
   } else if (errorType === 'CONTEXT_INVALIDATED') {
-    errorMessage = 'Extension updated. Please reload this page.';
+    errorMessage = 'Extension was updated, please refresh this page.';
     showRetry = false;
+    extraButton = '<button id="amz-reload-page" style="background:#232f3e; color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:11px; min-height:32px;">Refresh Page</button>';
+  } else if (errorType === 'AUTH_REQUIRED') {
+    errorMessage = 'Please log into Amazon first, then refresh.';
+    showRetry = false;
+    extraButton = '<button id="amz-go-login" style="background:#FF9900; color:#0f1111; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:600; min-height:32px;">Go to Login</button>';
   } else {
     errorMessage = 'Error loading data. Please try again.';
   }
@@ -854,8 +1472,11 @@ function showErrorPopup(errorType) {
       </div>
     </div>
     <div style="padding:12px 8px; font-size:12px; color:#B12704; text-align:center;">
-      <div style="margin-bottom:8px;">${errorMessage}</div>
-      ${showRetry ? '<button id="amz-retry" style="background:#232f3e; color:white; border:none; padding:4px 12px; border-radius:4px; cursor:pointer; font-size:11px;">Retry</button>' : ''}
+      <div style="margin-bottom:10px; line-height:1.4;">${errorMessage}</div>
+      <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+        ${showRetry ? '<button id="amz-retry" style="background:#232f3e; color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:11px; min-height:32px;">Retry</button>' : ''}
+        ${extraButton}
+      </div>
     </div>
   `;
 
@@ -869,6 +1490,14 @@ function showErrorPopup(errorType) {
       cachedSpendingData = {};
       loadData(true);
     };
+  }
+  const reloadBtn = document.getElementById('amz-reload-page');
+  if (reloadBtn) {
+    reloadBtn.onclick = () => location.reload();
+  }
+  const loginBtn = document.getElementById('amz-go-login');
+  if (loginBtn) {
+    loginBtn.onclick = () => { window.location.href = 'https://www.amazon.it/ap/signin'; };
   }
 
   setupDraggable(popup);
@@ -892,6 +1521,8 @@ function refreshRange(range) {
       isLoading30 = false;
       if (response && response.error === 'TAB_CREATE_FAILED') {
         showErrorPopup('TAB_CREATE_FAILED');
+      } else if (response && response.error === 'AUTH_REQUIRED') {
+        showErrorPopup('AUTH_REQUIRED');
       } else if (response && !response.error) {
         cachedSpendingData = {
           ...cachedSpendingData,
@@ -919,6 +1550,8 @@ function refreshRange(range) {
       isLoading3M = false;
       if (response && response.error === 'TAB_CREATE_FAILED') {
         showErrorPopup('TAB_CREATE_FAILED');
+      } else if (response && response.error === 'AUTH_REQUIRED') {
+        showErrorPopup('AUTH_REQUIRED');
       } else if (response && !response.error) {
         cachedSpendingData = {
           ...cachedSpendingData,
@@ -969,6 +1602,10 @@ function refreshAll() {
         showErrorPopup('TAB_CREATE_FAILED');
         return;
       }
+      if (response30 && response30.error === 'AUTH_REQUIRED') {
+        showErrorPopup('AUTH_REQUIRED');
+        return;
+      }
       if (response30 && !response30.error) {
         cachedSpendingData = {
           ...cachedSpendingData,
@@ -989,6 +1626,10 @@ function refreshAll() {
                 showErrorPopup('TAB_CREATE_FAILED');
                 return;
               }
+              if (response3M && response3M.error === 'AUTH_REQUIRED') {
+                showErrorPopup('AUTH_REQUIRED');
+                return;
+              }
               if (response3M && !response3M.error) {
                 cachedSpendingData = {
                   ...cachedSpendingData,
@@ -1005,11 +1646,14 @@ function refreshAll() {
       }
     });
   } else if (will3MLoad) {
-    // Only 3 months enabled
     safeSendMessage({ action: 'GET_SPENDING_3M', force: true }, response3M => {
       isLoading3M = false;
       if (response3M && response3M.error === 'TAB_CREATE_FAILED') {
         showErrorPopup('TAB_CREATE_FAILED');
+        return;
+      }
+      if (response3M && response3M.error === 'AUTH_REQUIRED') {
+        showErrorPopup('AUTH_REQUIRED');
         return;
       }
       if (response3M && !response3M.error) {
@@ -1134,7 +1778,7 @@ function loadData(showLoading = true) {
           });
         }
       } else if (response30 && response30.error === 'AUTH_REQUIRED') {
-        console.log('Tracker: Authentication required to fetch orders.');
+        showErrorPopup('AUTH_REQUIRED');
       }
     });
   } else if (need3Months) {
@@ -1161,7 +1805,7 @@ function loadData(showLoading = true) {
           injectPopup(cachedSpendingData);
         }
       } else if (response3M && response3M.error === 'AUTH_REQUIRED') {
-        console.log('Tracker: Authentication required to fetch orders.');
+        showErrorPopup('AUTH_REQUIRED');
       }
     });
   }
@@ -1367,9 +2011,9 @@ function showLockOverlay(settings, spendingData) {
     if (amount !== null) {
       spendingInfo = `
         <div style="margin-top:50px; text-align:center;">
-          <div style="font-size:16px; color:#ff9900; margin-bottom:16px;">You have spent</div>
-          <div style="font-size:56px; font-weight:700; color:#ff9900; line-height:1;">${amount} €</div>
-          <div style="font-size:15px; color:#a0a0a0; margin-top:12px;">${rangeLabel}</div>
+          <div style="font-size:clamp(12px, 2vw, 16px); color:#ff9900; margin-bottom:16px;">You have spent</div>
+          <div style="font-size:clamp(28px, 7vw, 56px); font-weight:700; color:#ff9900; line-height:1;">${amount} €</div>
+          <div style="font-size:clamp(12px, 2vw, 15px); color:#a0a0a0; margin-top:12px;">${rangeLabel}</div>
         </div>
       `;
     }
@@ -1386,19 +2030,19 @@ function showLockOverlay(settings, spendingData) {
       }
     </style>
     <div style="text-align:center;">
-      <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ff9900" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="animation: amz-lock-pulse 2s ease-in-out infinite;">
+      <svg style="width:clamp(48px, 10vw, 80px); height:clamp(48px, 10vw, 80px); animation: amz-lock-pulse 2s ease-in-out infinite;" viewBox="0 0 24 24" fill="none" stroke="#ff9900" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
       </svg>
-      <h1 style="font-size:28px; font-weight:700; margin:20px 0 10px 0;">Amazon is Locked</h1>
-      <p style="font-size:14px; color:#a0a0a0; margin:0;">Time set: ${settings.lockStartTime} - ${settings.lockEndTime}</p>
+      <h1 style="font-size:clamp(18px, 4vw, 28px); font-weight:700; margin:20px 0 10px 0;">Amazon is Locked</h1>
+      <p style="font-size:clamp(11px, 2vw, 14px); color:#a0a0a0; margin:0;">Time set: ${settings.lockStartTime} - ${settings.lockEndTime}</p>
     </div>
     <div style="margin-top:40px; text-align:center;">
-      <div style="font-size:14px; color:#a0a0a0; margin-bottom:25px;">Unlocks in</div>
-      <div id="amz-lock-timer" style="font-size:64px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:2px;">${formattedTime}</div>
+      <div style="font-size:clamp(11px, 2vw, 14px); color:#a0a0a0; margin-bottom:25px;">Unlocks in</div>
+      <div id="amz-lock-timer" style="font-size:clamp(32px, 8vw, 64px); font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:2px;">${formattedTime}</div>
     </div>
     ${spendingInfo}
-    <div style="position:absolute; bottom:30px; left:0; right:0; text-align:center;">
+    <div style="position:absolute; bottom:clamp(10px, 3vh, 30px); left:0; right:0; text-align:center;">
       <img src="${chrome.runtime.getURL('assets/images/icons/amz_icon.png')}" alt="Amazon Spending Tracker" style="width:24px; height:24px; margin-bottom:8px;">
       <p style="font-size:12px; color:#565959; margin:0;">Amazon Spending Tracker</p>
     </div>
@@ -1514,31 +2158,4 @@ function loadSpendingDataForLock(callback) {
   }
 }
 
-async function init() {
-  // Skip if this is a scraping tab opened by background.js
-  if (window.location.href.includes('_scraping=1')) return;
-
-  // Skip signin pages
-  if (window.location.href.includes('signin')) return;
-
-  const settings = getSettings();
-
-  // Check if interface lock is active
-  if (isInLockTimeRange(settings)) {
-    // Load spending data from cache and show lock overlay
-    loadSpendingDataForLock(spendingData => {
-      showLockOverlay(settings, spendingData);
-    });
-    return;
-  }
-
-  // Handle checkout page specially
-  if (window.location.href.includes('checkout')) {
-    observeCheckoutPage();
-    return;
-  }
-
-  loadData(true);
-}
-
-init();
+checkOnboardingAndInit();
