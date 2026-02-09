@@ -19,6 +19,7 @@ function refreshRange(range) {
     delete cachedSpendingData.orderCount;
     delete cachedSpendingData.limitReached;
     delete cachedSpendingData.updatedAt30;
+    delete cachedSpendingData.allCurrencies30;
     injectPopup(cachedSpendingData);
 
     safeSendMessage({ action: 'GET_SPENDING_30', force: true }, response => {
@@ -31,6 +32,8 @@ function refreshRange(range) {
           orderCount: response.orderCount,
           limitReached: response.limitReached,
           updatedAt30: response.updatedAt,
+          symbol: response.symbol,
+          allCurrencies30: response.allCurrencies,
         };
         injectPopup(cachedSpendingData);
       }
@@ -43,6 +46,7 @@ function refreshRange(range) {
     delete cachedSpendingData.orderCount3Months;
     delete cachedSpendingData.limitReached3Months;
     delete cachedSpendingData.updatedAt3M;
+    delete cachedSpendingData.allCurrencies3M;
     injectPopup(cachedSpendingData);
 
     safeSendMessage({ action: 'GET_SPENDING_3M', force: true }, response => {
@@ -55,6 +59,8 @@ function refreshRange(range) {
           orderCount3Months: response.orderCount,
           limitReached3Months: response.limitReached,
           updatedAt3M: response.updatedAt,
+          symbol: response.symbol,
+          allCurrencies3M: response.allCurrencies,
         };
         injectPopup(cachedSpendingData);
       }
@@ -76,6 +82,7 @@ function refreshAll() {
     delete cachedSpendingData.orderCount;
     delete cachedSpendingData.limitReached;
     delete cachedSpendingData.updatedAt30;
+    delete cachedSpendingData.allCurrencies30;
   }
   if (will3MLoad) {
     isLoading3M = true;
@@ -83,6 +90,7 @@ function refreshAll() {
     delete cachedSpendingData.orderCount3Months;
     delete cachedSpendingData.limitReached3Months;
     delete cachedSpendingData.updatedAt3M;
+    delete cachedSpendingData.allCurrencies3M;
   }
   injectPopup(cachedSpendingData);
 
@@ -97,6 +105,8 @@ function refreshAll() {
           orderCount: response30.orderCount,
           limitReached: response30.limitReached,
           updatedAt30: response30.updatedAt,
+          symbol: response30.symbol,
+          allCurrencies30: response30.allCurrencies,
         };
         injectPopup(cachedSpendingData);
 
@@ -113,6 +123,8 @@ function refreshAll() {
                   orderCount3Months: response3M.orderCount,
                   limitReached3Months: response3M.limitReached,
                   updatedAt3M: response3M.updatedAt,
+                  symbol: response3M.symbol,
+                  allCurrencies3M: response3M.allCurrencies,
                 };
                 injectPopup(cachedSpendingData);
               }
@@ -132,6 +144,8 @@ function refreshAll() {
           orderCount3Months: response3M.orderCount,
           limitReached3Months: response3M.limitReached,
           updatedAt3M: response3M.updatedAt,
+          symbol: response3M.symbol,
+          allCurrencies3M: response3M.allCurrencies,
         };
         injectPopup(cachedSpendingData);
       }
@@ -207,6 +221,8 @@ function loadData(showLoading = true) {
           orderCount: response30.orderCount,
           limitReached: response30.limitReached,
           updatedAt30: response30.updatedAt,
+          symbol: response30.symbol,
+          allCurrencies30: response30.allCurrencies,
         };
 
         updatePopupOrIcon();
@@ -222,6 +238,8 @@ function loadData(showLoading = true) {
                 orderCount3Months: response3M.orderCount,
                 limitReached3Months: response3M.limitReached,
                 updatedAt3M: response3M.updatedAt,
+                symbol: response3M.symbol,
+                allCurrencies3M: response3M.allCurrencies,
               };
 
               updatePopupOrIcon();
@@ -243,6 +261,8 @@ function loadData(showLoading = true) {
           orderCount3Months: response3M.orderCount,
           limitReached3Months: response3M.limitReached,
           updatedAt3M: response3M.updatedAt,
+          symbol: response3M.symbol,
+          allCurrencies3M: response3M.allCurrencies,
         };
 
         updatePopupOrIcon();

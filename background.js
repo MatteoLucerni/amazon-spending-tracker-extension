@@ -1,6 +1,58 @@
-const STORAGE_KEY_30 = 'amz_spending_cache_30';
-const STORAGE_KEY_3M = 'amz_spending_cache_3m';
-const CACHE_TIME = 1000 * 60 * 60 * 24; // 1 day
+importScripts('src/constants.js');
+
+const CACHE_TIME = 1000 * 60 * 60 * 24;
+
+function getStorageKey(period, domain) {
+  return `amz_spending_cache_${period}_${domain}`;
+}
+
+async function aggregateAllDomains(period) {
+  const allData = await chrome.storage.local.get(null);
+  const prefix = `amz_spending_cache_${period}_`;
+  const now = Date.now();
+  const byCurrency = {};
+
+  for (const [key, value] of Object.entries(allData)) {
+    if (!key.startsWith(prefix)) continue;
+    if (!value || !value.data) continue;
+    if (now - value.ts > CACHE_TIME) continue;
+
+    const domain = key.substring(prefix.length);
+    const config = getAmazonDomainConfig(domain);
+    const curr = config.currency;
+
+    if (!byCurrency[curr]) {
+      byCurrency[curr] = { total: 0, orderCount: 0, symbol: config.symbol, currency: curr };
+    }
+    byCurrency[curr].total += value.data.total || 0;
+    byCurrency[curr].orderCount += value.data.orderCount || 0;
+  }
+
+  const expiredKeys = [];
+  for (const [key, value] of Object.entries(allData)) {
+    if (!key.startsWith(prefix)) continue;
+    if (value && value.data && now - value.ts > CACHE_TIME) {
+      expiredKeys.push(key);
+    }
+  }
+  if (expiredKeys.length > 0) {
+    chrome.storage.local.remove(expiredKeys);
+  }
+
+  return Object.values(byCurrency).sort((a, b) => b.total - a.total);
+}
+
+function getDomainFromSender(sender) {
+  try {
+    const url = sender.tab?.url || sender.url || '';
+    if (url) {
+      const hostname = new URL(url).hostname;
+      if (AMAZON_DOMAINS[hostname]) return hostname;
+      console.warn(`[Amazon Tracker] Unknown domain: ${hostname}, ignoring request`);
+    }
+  } catch (e) {}
+  return null;
+}
 
 async function createTabWithRetry(url, maxRetries = 3) {
   let lastError = null;
@@ -30,8 +82,8 @@ async function createTabWithRetry(url, maxRetries = 3) {
   throw lastError;
 }
 
-async function scrapeSinglePage(filter, startIndex = 0) {
-  let url = `https://www.amazon.it/your-orders/orders?timeFilter=${filter}&_scraping=1`;
+async function scrapeSinglePage(filter, domain, domainConfig, startIndex = 0) {
+  let url = `https://${domain}/your-orders/orders?timeFilter=${filter}&_scraping=1`;
   if (startIndex > 0) {
     url += `&startIndex=${startIndex}`;
   }
@@ -53,22 +105,31 @@ async function scrapeSinglePage(filter, startIndex = 0) {
           try {
             const results = await chrome.scripting.executeScript({
               target: { tabId: tab.id },
-              func: () => {
+              func: (totalPatternStr, priceFormat) => {
                 let pageSum = 0;
                 let orderCount = 0;
+                const totalRegex = new RegExp(totalPatternStr, 'i');
                 const items = document.querySelectorAll(
                   '.order-header__header-list-item',
                 );
 
                 items.forEach(item => {
-                  if (/total|totale/i.test(item.innerText)) {
+                  if (totalRegex.test(item.innerText)) {
                     const lines = item.innerText.trim().split('\n');
                     const priceRaw = lines[lines.length - 1];
                     let clean = priceRaw.replace(/[^\d.,]/g, '').trim();
-                    if (clean.includes('.') && clean.includes(',')) {
-                      clean = clean.replace(/\./g, '').replace(',', '.');
-                    } else if (clean.includes(',')) {
-                      clean = clean.replace(',', '.');
+                    if (priceFormat === 'eu') {
+                      if (clean.includes('.') && clean.includes(',')) {
+                        clean = clean.replace(/\./g, '').replace(',', '.');
+                      } else if (clean.includes(',')) {
+                        clean = clean.replace(',', '.');
+                      } else if (clean.includes('.') && /^\d{1,3}(\.\d{3})+$/.test(clean)) {
+                        clean = clean.replace(/\./g, '');
+                      }
+                    } else if (priceFormat === 'jp') {
+                      clean = clean.replace(/,/g, '');
+                    } else {
+                      clean = clean.replace(/,/g, '');
                     }
                     const amount = parseFloat(clean) || 0;
                     if (amount > 0) {
@@ -86,6 +147,7 @@ async function scrapeSinglePage(filter, startIndex = 0) {
                     document.querySelector('form[action*="signin"]') !== null,
                 };
               },
+              args: [domainConfig.totalPattern, domainConfig.priceFormat],
             });
 
             const data = results[0].result;
@@ -102,15 +164,15 @@ async function scrapeSinglePage(filter, startIndex = 0) {
   });
 }
 
-async function scrapeWithTab(filter) {
+async function scrapeWithTab(filter, domain, domainConfig) {
   let totalSum = 0;
   let startIndex = 0;
-  const maxPages = 20; // Limite per evitare troppe tab
+  const maxPages = 20;
   let totalOrders = 0;
   let limitReached = false;
 
   for (let page = 0; page < maxPages; page++) {
-    const result = await scrapeSinglePage(filter, startIndex);
+    const result = await scrapeSinglePage(filter, domain, domainConfig, startIndex);
 
     if (result.error === 'TAB_CREATE_FAILED') {
       return { sum: -1, orderCount: 0, limitReached: false, error: 'TAB_CREATE_FAILED' };
@@ -120,9 +182,8 @@ async function scrapeWithTab(filter) {
       return { sum: -1, orderCount: 0, limitReached: false };
     }
 
-    console.log(`[Amazon Tracker] ${filter} - Page ${page + 1}: ${result.orderCount} orders, €${result.sum.toFixed(2)}`);
+    console.log(`[Amazon Tracker] ${filter} - Page ${page + 1}: ${result.orderCount} orders, ${domainConfig.symbol}${result.sum.toFixed(2)}`);
 
-    // Se non ci sono ordini in questa pagina, abbiamo finito
     if (result.orderCount === 0) {
       console.log(`[Amazon Tracker] ${filter} - No more orders found, stopping.`);
       break;
@@ -131,13 +192,11 @@ async function scrapeWithTab(filter) {
     totalSum += result.sum;
     totalOrders += result.orderCount;
 
-    // Amazon mostra 10 ordini per pagina, se ne troviamo meno significa che è l'ultima pagina
     if (result.orderCount < 10) {
       console.log(`[Amazon Tracker] ${filter} - Found less than 10 orders, this is the last page.`);
       break;
     }
 
-    // Se abbiamo raggiunto il limite di pagine
     if (page === maxPages - 1) {
       console.log(`[Amazon Tracker] ${filter} - Reached page limit (${maxPages} pages)`);
       limitReached = true;
@@ -147,7 +206,7 @@ async function scrapeWithTab(filter) {
     startIndex += 10;
   }
 
-  console.log(`[Amazon Tracker] ${filter} TOTAL: ${totalOrders} orders, €${totalSum.toFixed(2)}${limitReached ? ' (limit reached)' : ''}`);
+  console.log(`[Amazon Tracker] ${filter} TOTAL: ${totalOrders} orders, ${domainConfig.symbol}${totalSum.toFixed(2)}${limitReached ? ' (limit reached)' : ''}`);
 
   return { sum: totalSum, orderCount: totalOrders, limitReached };
 }
@@ -155,19 +214,43 @@ async function scrapeWithTab(filter) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'GET_SPENDING_30') {
     (async () => {
-      const cached = await chrome.storage.local.get(STORAGE_KEY_30);
+      const domain = getDomainFromSender(sender);
+      if (!domain) {
+        sendResponse({ error: 'UNKNOWN_DOMAIN' });
+        return;
+      }
+      const domainConfig = getAmazonDomainConfig(domain);
+      const storageKey = getStorageKey('30', domain);
+      const cached = await chrome.storage.local.get(storageKey);
       const now = Date.now();
 
-      if (!request.force && cached[STORAGE_KEY_30] && now - cached[STORAGE_KEY_30].ts < CACHE_TIME) {
+      if (!request.force && cached[storageKey] && now - cached[storageKey].ts < CACHE_TIME) {
         console.log('[Amazon Tracker] Using cached data for last 30 days');
-        sendResponse({ ...cached[STORAGE_KEY_30].data, updatedAt: cached[STORAGE_KEY_30].ts });
+        const allCurrencies = await aggregateAllDomains('30');
+        sendResponse({
+          ...cached[storageKey].data,
+          updatedAt: cached[storageKey].ts,
+          symbol: domainConfig.symbol,
+          currency: domainConfig.currency,
+          allCurrencies
+        });
       } else if (request.cacheOnly) {
-        // Cache only mode: return empty if no valid cache
-        console.log('[Amazon Tracker] Cache only mode: no valid cache for 30 days');
-        sendResponse({ noCache: true });
+        const allCurrencies = await aggregateAllDomains('30');
+        if (allCurrencies.length > 0) {
+          const currentCurrency = allCurrencies.find(c => c.currency === domainConfig.currency);
+          sendResponse({
+            total: currentCurrency ? currentCurrency.total : 0,
+            orderCount: currentCurrency ? currentCurrency.orderCount : 0,
+            symbol: domainConfig.symbol,
+            currency: domainConfig.currency,
+            allCurrencies
+          });
+        } else {
+          sendResponse({ noCache: true });
+        }
       } else {
         console.log('[Amazon Tracker] Fetching last 30 days...');
-        const result = await scrapeWithTab('last30');
+        const result = await scrapeWithTab('last30', domain, domainConfig);
         if (result.sum === -1) {
           if (result.error === 'TAB_CREATE_FAILED') {
             sendResponse({ error: 'TAB_CREATE_FAILED' });
@@ -182,8 +265,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           orderCount: result.orderCount,
           limitReached: result.limitReached
         };
-        await chrome.storage.local.set({ [STORAGE_KEY_30]: { data, ts: now } });
-        sendResponse({ ...data, updatedAt: now });
+        await chrome.storage.local.set({ [storageKey]: { data, ts: now } });
+        const allCurrencies = await aggregateAllDomains('30');
+        sendResponse({
+          ...data,
+          updatedAt: now,
+          symbol: domainConfig.symbol,
+          currency: domainConfig.currency,
+          allCurrencies
+        });
       }
     })();
     return true;
@@ -191,19 +281,43 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === 'GET_SPENDING_3M') {
     (async () => {
-      const cached = await chrome.storage.local.get(STORAGE_KEY_3M);
+      const domain = getDomainFromSender(sender);
+      if (!domain) {
+        sendResponse({ error: 'UNKNOWN_DOMAIN' });
+        return;
+      }
+      const domainConfig = getAmazonDomainConfig(domain);
+      const storageKey = getStorageKey('3m', domain);
+      const cached = await chrome.storage.local.get(storageKey);
       const now = Date.now();
 
-      if (!request.force && cached[STORAGE_KEY_3M] && now - cached[STORAGE_KEY_3M].ts < CACHE_TIME) {
+      if (!request.force && cached[storageKey] && now - cached[storageKey].ts < CACHE_TIME) {
         console.log('[Amazon Tracker] Using cached data for last 3 months');
-        sendResponse({ ...cached[STORAGE_KEY_3M].data, updatedAt: cached[STORAGE_KEY_3M].ts });
+        const allCurrencies = await aggregateAllDomains('3m');
+        sendResponse({
+          ...cached[storageKey].data,
+          updatedAt: cached[storageKey].ts,
+          symbol: domainConfig.symbol,
+          currency: domainConfig.currency,
+          allCurrencies
+        });
       } else if (request.cacheOnly) {
-        // Cache only mode: return empty if no valid cache
-        console.log('[Amazon Tracker] Cache only mode: no valid cache for 3 months');
-        sendResponse({ noCache: true });
+        const allCurrencies = await aggregateAllDomains('3m');
+        if (allCurrencies.length > 0) {
+          const currentCurrency = allCurrencies.find(c => c.currency === domainConfig.currency);
+          sendResponse({
+            total: currentCurrency ? currentCurrency.total : 0,
+            orderCount: currentCurrency ? currentCurrency.orderCount : 0,
+            symbol: domainConfig.symbol,
+            currency: domainConfig.currency,
+            allCurrencies
+          });
+        } else {
+          sendResponse({ noCache: true });
+        }
       } else {
         console.log('[Amazon Tracker] Fetching last 3 months...');
-        const result = await scrapeWithTab('months-3');
+        const result = await scrapeWithTab('months-3', domain, domainConfig);
         if (result.sum === -1) {
           if (result.error === 'TAB_CREATE_FAILED') {
             sendResponse({ error: 'TAB_CREATE_FAILED' });
@@ -218,8 +332,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           orderCount: result.orderCount,
           limitReached: result.limitReached
         };
-        await chrome.storage.local.set({ [STORAGE_KEY_3M]: { data, ts: now } });
-        sendResponse({ ...data, updatedAt: now });
+        await chrome.storage.local.set({ [storageKey]: { data, ts: now } });
+        const allCurrencies = await aggregateAllDomains('3m');
+        sendResponse({
+          ...data,
+          updatedAt: now,
+          symbol: domainConfig.symbol,
+          currency: domainConfig.currency,
+          allCurrencies
+        });
       }
     })();
     return true;

@@ -95,7 +95,9 @@ function injectDemoPopup() {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: rc.popupWidth + 'px',
+    width: 'auto',
+    minWidth: rc.popupMinWidth + 'px',
+    maxWidth: rc.popupMaxWidth + 'px',
     height: popupHeight + 'px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
@@ -127,7 +129,7 @@ function injectDemoPopup() {
       <div id="amz-range-30">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="color:#565959;">Last 30 days:</span>
-          <b style="color:#B12704; font-size:14px;">-- €</b>
+          <b style="color:#B12704; font-size:14px;">-- ${getCurrentDomainConfig().symbol}</b>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="font-size:11px; color:#767676;">- orders</span>
@@ -137,7 +139,7 @@ function injectDemoPopup() {
       <div id="amz-range-3m" style="border-top:1px solid #e7e7e7; padding-top:4px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="color:#565959;">Last 3 months:</span>
-          <b style="color:#B12704; font-size:14px;">-- €</b>
+          <b style="color:#B12704; font-size:14px;">-- ${getCurrentDomainConfig().symbol}</b>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="font-size:11px; color:#767676;">- orders</span>

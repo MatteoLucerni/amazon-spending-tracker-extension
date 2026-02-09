@@ -1,11 +1,29 @@
 let cachedSpendingData = {};
 let contextInvalidated = false;
 
+function formatAmountHtml(allCurrencies, singleTotal, defaultSymbol) {
+  if (allCurrencies && allCurrencies.length > 1) {
+    return allCurrencies.map(c => `${Math.round(c.total)} ${c.symbol}`).join(' · ');
+  }
+  if (allCurrencies && allCurrencies.length === 1) {
+    return `${Math.round(allCurrencies[0].total)} ${allCurrencies[0].symbol}`;
+  }
+  const symbol = defaultSymbol || getCurrentDomainConfig().symbol;
+  return `${Math.round(singleTotal)} ${symbol}`;
+}
+
+function getTotalOrders(allCurrencies, singleOrderCount) {
+  if (allCurrencies && allCurrencies.length > 0) {
+    return allCurrencies.reduce((sum, c) => sum + c.orderCount, 0);
+  }
+  return singleOrderCount;
+}
+
 function getResponsiveConfig() {
   const vw = document.documentElement.clientWidth;
-  if (vw <= 480) return { tier: 'mobile', popupWidth: vw - 20, settingsWidth: vw - 20, maxSettingsHeight: '70vh', draggable: false, tourTooltipMode: 'bottom-sheet', tourTooltipMaxWidth: vw - 32, welcomeMaxWidth: vw - 32, minIconSize: 44 };
-  if (vw <= 768) return { tier: 'tablet', popupWidth: Math.min(Math.max(140, vw * 0.22), 180), settingsWidth: 200, maxSettingsHeight: 'none', draggable: true, tourTooltipMode: 'positioned', tourTooltipMaxWidth: 280, welcomeMaxWidth: 400, minIconSize: 36 };
-  return { tier: 'desktop', popupWidth: 160, settingsWidth: 200, maxSettingsHeight: 'none', draggable: true, tourTooltipMode: 'positioned', tourTooltipMaxWidth: 320, welcomeMaxWidth: 400, minIconSize: 36 };
+  if (vw <= 480) return { tier: 'mobile', popupMinWidth: vw - 20, popupMaxWidth: vw - 20, settingsWidth: vw - 20, maxSettingsHeight: '70vh', draggable: false, tourTooltipMode: 'bottom-sheet', tourTooltipMaxWidth: vw - 32, welcomeMaxWidth: vw - 32, minIconSize: 44 };
+  if (vw <= 768) return { tier: 'tablet', popupMinWidth: 140, popupMaxWidth: 280, settingsWidth: 200, maxSettingsHeight: 'none', draggable: true, tourTooltipMode: 'positioned', tourTooltipMaxWidth: 280, welcomeMaxWidth: 400, minIconSize: 36 };
+  return { tier: 'desktop', popupMinWidth: 160, popupMaxWidth: 320, settingsWidth: 200, maxSettingsHeight: 'none', draggable: true, tourTooltipMode: 'positioned', tourTooltipMaxWidth: 320, welcomeMaxWidth: 400, minIconSize: 36 };
 }
 
 function formatRelativeTime(timestamp) {

@@ -77,9 +77,9 @@ function showSettingsView() {
     mainRect = mainPopup.getBoundingClientRect();
   }
 
-  const currentPosition = getCurrentPopupPosition();
-  if (currentPosition) {
-    savePopupState(false, currentPosition);
+  const side = getPopupSide();
+  if (side) {
+    savePopupState(false, side);
   }
 
   const existing = document.getElementById(POPUP_ID);
@@ -106,13 +106,13 @@ function showSettingsView() {
     width: settingsWidth + 'px',
     height: 'auto',
     maxHeight: rc.maxSettingsHeight,
-    overflow: 'hidden',
+    overflow: 'visible',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
   };
 
-  applyPosition(baseStyle, savedState.position, settingsHeight, settingsWidth);
+  applyPosition(baseStyle, savedState.side);
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
@@ -129,8 +129,7 @@ function showSettingsView() {
       .amz-help-icon { position:relative; display:inline-flex; align-items:center; cursor:help; margin-left:4px; }
       .amz-help-icon svg { color:#767676; transition:color .2s; }
       .amz-help-icon:hover svg { color:#232f3e; }
-      .amz-help-tooltip { position:absolute; right:calc(100% + 6px); top:50%; transform:translateY(-50%); background:#232f3e; color:#fff; padding:6px 8px; border-radius:4px; font-size:11px; line-height:1.3; max-width:140px; white-space:normal; opacity:0; visibility:hidden; transition:opacity .2s, visibility .2s; z-index:10; pointer-events:none; }
-      .amz-help-icon:hover .amz-help-tooltip { opacity:1; visibility:visible; }
+      .amz-help-tooltip { position:fixed; background:#232f3e; color:#fff; padding:6px 8px; border-radius:4px; font-size:11px; line-height:1.3; max-width:140px; white-space:normal; opacity:0; visibility:hidden; transition:opacity .2s, visibility .2s; z-index:2147483647; pointer-events:none; }
       .amz-settings-content { overflow:visible; }
     </style>
     <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
@@ -186,30 +185,6 @@ function showSettingsView() {
 
   document.body.appendChild(popup);
 
-  const actualHeight = popup.offsetHeight;
-  const viewportHeight = document.documentElement.clientHeight;
-  const viewportWidth = document.documentElement.clientWidth;
-  const margin = 10;
-
-  if (mainRect) {
-    const viewportCenter = viewportWidth / 2;
-    const popupCenter = (mainRect.left + mainRect.right) / 2;
-    let newLeft = popupCenter < viewportCenter ? mainRect.left : mainRect.right - settingsWidth;
-    let newTop = mainRect.bottom - actualHeight;
-    newLeft = Math.max(margin, Math.min(newLeft, viewportWidth - settingsWidth - margin));
-    newTop = Math.max(margin, Math.min(newTop, viewportHeight - actualHeight - margin));
-    popup.style.left = newLeft + 'px';
-    popup.style.top = newTop + 'px';
-    popup.style.bottom = '';
-    popup.style.right = '';
-  } else if (popup.style.top) {
-    let currentTop = parseFloat(popup.style.top);
-    const maxTop = viewportHeight - actualHeight - margin;
-    if (currentTop > maxTop) {
-      popup.style.top = Math.max(margin, maxTop) + 'px';
-    }
-  }
-
   document.getElementById('amz-replay-tutorial').onclick = () => {
     popup.remove();
     chrome.storage.local.set({ 'amz-onboarding-completed': false });
@@ -230,19 +205,12 @@ function showSettingsView() {
 
     const settingsPopup = document.getElementById(POPUP_ID);
     if (settingsPopup) {
-      const settingsRect = settingsPopup.getBoundingClientRect();
-      const rc = getResponsiveConfig();
-      const enabledCount = (newSettings.show30Days ? 1 : 0) + (newSettings.show3Months ? 1 : 0);
-      const mainHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 24;
-      const mainWidth = rc.popupWidth;
+      const rect = settingsPopup.getBoundingClientRect();
       const viewportCenter = document.documentElement.clientWidth / 2;
-      const popupCenter = (settingsRect.left + settingsRect.right) / 2;
-      const adjustedLeft = popupCenter < viewportCenter
-        ? settingsRect.left
-        : settingsRect.right - mainWidth;
-      const adjustedTop = settingsRect.bottom - mainHeight;
+      const popupCenter = (rect.left + rect.right) / 2;
+      const side = popupCenter < viewportCenter ? 'left' : 'right';
       settingsPopup.remove();
-      savePopupState(false, { left: adjustedLeft, top: adjustedTop });
+      savePopupState(false, side);
     }
 
     loadData(true);
@@ -287,6 +255,34 @@ function showSettingsView() {
 
   document.getElementById('amz-lock-start').onchange = saveCurrentSettings;
   document.getElementById('amz-lock-end').onchange = saveCurrentSettings;
+
+  popup.querySelectorAll('.amz-help-icon').forEach(icon => {
+    const tooltip = icon.querySelector('.amz-help-tooltip');
+    if (!tooltip) return;
+
+    icon.addEventListener('mouseenter', () => {
+      const iconRect = icon.getBoundingClientRect();
+      const tooltipWidth = 152;
+      const tooltipGap = 6;
+      const vw = document.documentElement.clientWidth;
+
+      if (iconRect.left - tooltipWidth - tooltipGap >= 0) {
+        tooltip.style.left = (iconRect.left - tooltipWidth - tooltipGap) + 'px';
+      } else {
+        tooltip.style.left = (iconRect.right + tooltipGap) + 'px';
+      }
+
+      tooltip.style.top = (iconRect.top + iconRect.height / 2) + 'px';
+      tooltip.style.transform = 'translateY(-50%)';
+      tooltip.style.opacity = '1';
+      tooltip.style.visibility = 'visible';
+    });
+
+    icon.addEventListener('mouseleave', () => {
+      tooltip.style.opacity = '0';
+      tooltip.style.visibility = 'hidden';
+    });
+  });
 
   setupDraggable(popup);
 }
