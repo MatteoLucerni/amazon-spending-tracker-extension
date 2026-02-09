@@ -64,4 +64,28 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // Feedback widget
+    var feedbackWidget = document.querySelector('.feedback');
+    var feedbackFab = document.querySelector('.feedback__fab');
+
+    if (feedbackFab && feedbackWidget) {
+        feedbackFab.addEventListener('click', function () {
+            feedbackWidget.classList.toggle('open');
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', function (e) {
+            if (!feedbackWidget.contains(e.target)) {
+                feedbackWidget.classList.remove('open');
+            }
+        });
+
+        // Close on Escape
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                feedbackWidget.classList.remove('open');
+            }
+        });
+    }
 });
