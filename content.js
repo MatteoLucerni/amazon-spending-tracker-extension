@@ -4,6 +4,7 @@ let isLoading30 = false;
 let isLoading3M = false;
 let tourActive = false;
 let resizeDebounceTimer = null;
+let dragAbortController = null;
 
 function getResponsiveConfig() {
   const vw = document.documentElement.clientWidth;
@@ -125,6 +126,18 @@ function showWelcomeGate(onStartTour, onSkip) {
     overlay.remove();
     onSkip();
   };
+
+  const welcomeKeyHandler = (e) => {
+    if (e.key === 'Escape' && document.getElementById('amz-welcome-overlay')) {
+      if (!skipBtn.disabled) {
+        clearInterval(countdownInterval);
+        overlay.remove();
+        document.removeEventListener('keydown', welcomeKeyHandler);
+        onSkip();
+      }
+    }
+  };
+  document.addEventListener('keydown', welcomeKeyHandler);
 }
 
 function injectDemoPopup() {
@@ -262,6 +275,8 @@ function startTour() {
 
     const oldTooltip = document.getElementById('amz-tour-tooltip');
     if (oldTooltip) oldTooltip.remove();
+    const oldCenterOverlay = document.getElementById('amz-tour-center-overlay');
+    if (oldCenterOverlay) oldCenterOverlay.remove();
 
     const popup = document.getElementById('amz-spending-popup');
     if (popup) popup.style.zIndex = '2147483645';
@@ -373,7 +388,6 @@ function startTour() {
     const vh = document.documentElement.clientHeight;
     const gap = 12;
 
-    document.body.appendChild(tooltip);
     const tw = tooltip.offsetWidth;
     const th = tooltip.offsetHeight;
 
@@ -410,6 +424,7 @@ function startTour() {
 
   function endTour() {
     tourActive = false;
+    document.removeEventListener('keydown', handleKeyboard);
     const spotlight = document.getElementById('amz-tour-spotlight');
     if (spotlight) spotlight.remove();
     const backdrop = document.getElementById('amz-tour-backdrop');
@@ -502,6 +517,7 @@ function safeSendMessage(message, callback) {
         // Log as warning for non-critical errors like "message channel closed"
         if (errorMessage.includes('message channel closed')) {
           console.warn('[Amazon Tracker] sendMessage warning:', errorMessage);
+          if (callback) callback(null);
           return;
         }
         console.error('[Amazon Tracker] sendMessage error:', errorMessage);
@@ -631,9 +647,9 @@ function showLockConfirmDialog(onConfirm, onCancel) {
     if (onConfirm) onConfirm();
   };
 
-  // Close on overlay click
   overlay.onclick = (e) => {
     if (e.target === overlay) {
+      clearInterval(countdownInterval);
       overlay.remove();
       if (onCancel) onCancel();
     }
@@ -669,6 +685,8 @@ function showSettingsView() {
     fontFamily: 'Amazon Ember, Arial, sans-serif',
     width: settingsWidth + 'px',
     height: settingsHeight + 'px',
+    maxHeight: rc.maxSettingsHeight,
+    overflowY: 'auto',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
@@ -1021,9 +1039,7 @@ function showMinimizedIcon() {
   }
 
   icon.onclick = () => {
-    if (cachedSpendingData) {
-      injectPopup(cachedSpendingData);
-    }
+    injectPopup(cachedSpendingData || {});
   };
 
   document.body.appendChild(icon);
@@ -1035,6 +1051,7 @@ function showLoadingPopup() {
   if (existing) existing.remove();
 
   const savedState = getPopupState();
+  const rc = getResponsiveConfig();
   const popup = document.createElement('div');
   popup.id = 'amz-spending-popup';
 
@@ -1047,14 +1064,21 @@ function showLoadingPopup() {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '160px',
+    width: rc.popupWidth + 'px',
     height: '130px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
   };
 
-  applyPosition(baseStyle, savedState.position, 130);
+  if (rc.tier === 'mobile') {
+    baseStyle.left = '10px';
+    baseStyle.right = '10px';
+    baseStyle.width = 'auto';
+    baseStyle.bottom = '10px';
+  } else {
+    applyPosition(baseStyle, savedState.position, 130);
+  }
   Object.assign(popup.style, baseStyle);
 
   popup.innerHTML = `
@@ -1090,6 +1114,10 @@ function showLoadingPopup() {
 }
 
 function setupDraggable(popup) {
+  if (dragAbortController) dragAbortController.abort();
+  dragAbortController = new AbortController();
+  const signal = dragAbortController.signal;
+
   let isDragging = false;
   let hasDragged = false;
   let offsetX = 0;
@@ -1098,14 +1126,14 @@ function setupDraggable(popup) {
   const dragHandle = document.getElementById('amz-drag-handle');
   if (!dragHandle) return;
 
+  const headerBtnIds = ['amz-close', 'amz-settings', 'amz-back', 'amz-refresh-all'];
   const dragStart = e => {
     if (e.target === dragHandle || dragHandle.contains(e.target)) {
-      if (
-        e.target.id === 'amz-close' ||
-        e.target.id === 'amz-settings' ||
-        e.target.id === 'amz-back'
-      )
-        return; // Don't drag when clicking buttons
+      const isHeaderButton = headerBtnIds.some(id => {
+        const el = document.getElementById(id);
+        return el && (el === e.target || el.contains(e.target));
+      });
+      if (isHeaderButton) return;
       isDragging = true;
       hasDragged = false;
       const rect = popup.getBoundingClientRect();
@@ -1142,9 +1170,9 @@ function setupDraggable(popup) {
     hasDragged = false;
   };
 
-  dragHandle.addEventListener('mousedown', dragStart);
-  document.addEventListener('mousemove', drag);
-  document.addEventListener('mouseup', dragEnd);
+  dragHandle.addEventListener('mousedown', dragStart, { signal });
+  document.addEventListener('mousemove', drag, { signal });
+  document.addEventListener('mouseup', dragEnd, { signal });
 }
 
 function injectPopup(data) {
@@ -1168,6 +1196,7 @@ function injectPopup(data) {
   // Calculate height based on enabled ranges (add extra height for lock status)
   const enabledCount =
     (settings.show30Days ? 1 : 0) + (settings.show3Months ? 1 : 0);
+  const rc = getResponsiveConfig();
   const popupHeight = (enabledCount === 2 ? 140 : enabledCount === 1 ? 90 : 85) + 24;
 
   const baseStyle = {
@@ -1179,7 +1208,7 @@ function injectPopup(data) {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '160px',
+    width: rc.popupWidth + 'px',
     height: popupHeight + 'px',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
@@ -1187,7 +1216,14 @@ function injectPopup(data) {
     overflow: 'hidden',
   };
 
-  applyPosition(baseStyle, savedState.position, popupHeight);
+  if (rc.tier === 'mobile') {
+    baseStyle.left = '10px';
+    baseStyle.right = '10px';
+    baseStyle.width = 'auto';
+    baseStyle.bottom = '10px';
+  } else {
+    applyPosition(baseStyle, savedState.position, popupHeight);
+  }
   Object.assign(popup.style, baseStyle);
 
   const is30DaysLoading = data.total === undefined;
@@ -1294,8 +1330,9 @@ function injectPopup(data) {
         </div>
     `;
 
+  const isFirstAppearance = !existing;
   document.body.appendChild(popup);
-  popup.classList.add('amz-popup-enter');
+  if (isFirstAppearance) popup.classList.add('amz-popup-enter');
 
   document.getElementById('amz-close').onclick = () => showMinimizedIcon();
   document.getElementById('amz-settings').onclick = () => showSettingsView();
@@ -1330,6 +1367,7 @@ function showErrorPopup(errorType) {
   if (existing) existing.remove();
 
   const savedState = getPopupState();
+  const rc = getResponsiveConfig();
   const popup = document.createElement('div');
   popup.id = 'amz-spending-popup';
 
@@ -1342,14 +1380,22 @@ function showErrorPopup(errorType) {
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(15,17,17,0.15)',
     fontFamily: 'Amazon Ember, Arial, sans-serif',
-    width: '160px',
-    height: '130px',
+    width: rc.popupWidth + 'px',
+    minHeight: '130px',
+    height: 'auto',
     border: '1px solid #d5d9d9',
     boxSizing: 'border-box',
     userSelect: 'none',
   };
 
-  applyPosition(baseStyle, savedState.position, 130);
+  if (rc.tier === 'mobile') {
+    baseStyle.left = '10px';
+    baseStyle.right = '10px';
+    baseStyle.width = 'auto';
+    baseStyle.bottom = '10px';
+  } else {
+    applyPosition(baseStyle, savedState.position, 130);
+  }
   Object.assign(popup.style, baseStyle);
 
   let errorMessage;
@@ -1363,6 +1409,7 @@ function showErrorPopup(errorType) {
     extraButton = '<button id="amz-reload-page" style="background:#232f3e; color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:11px; min-height:32px;">Refresh Page</button>';
   } else if (errorType === 'AUTH_REQUIRED') {
     errorMessage = 'Please log into Amazon first, then refresh.';
+    showRetry = false;
     extraButton = '<button id="amz-go-login" style="background:#FF9900; color:#0f1111; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:600; min-height:32px;">Go to Login</button>';
   } else {
     errorMessage = 'Error loading data. Please try again.';
@@ -1426,6 +1473,8 @@ function refreshRange(range) {
       isLoading30 = false;
       if (response && response.error === 'TAB_CREATE_FAILED') {
         showErrorPopup('TAB_CREATE_FAILED');
+      } else if (response && response.error === 'AUTH_REQUIRED') {
+        showErrorPopup('AUTH_REQUIRED');
       } else if (response && !response.error) {
         cachedSpendingData = {
           ...cachedSpendingData,
@@ -1453,6 +1502,8 @@ function refreshRange(range) {
       isLoading3M = false;
       if (response && response.error === 'TAB_CREATE_FAILED') {
         showErrorPopup('TAB_CREATE_FAILED');
+      } else if (response && response.error === 'AUTH_REQUIRED') {
+        showErrorPopup('AUTH_REQUIRED');
       } else if (response && !response.error) {
         cachedSpendingData = {
           ...cachedSpendingData,
@@ -1503,6 +1554,10 @@ function refreshAll() {
         showErrorPopup('TAB_CREATE_FAILED');
         return;
       }
+      if (response30 && response30.error === 'AUTH_REQUIRED') {
+        showErrorPopup('AUTH_REQUIRED');
+        return;
+      }
       if (response30 && !response30.error) {
         cachedSpendingData = {
           ...cachedSpendingData,
@@ -1523,6 +1578,10 @@ function refreshAll() {
                 showErrorPopup('TAB_CREATE_FAILED');
                 return;
               }
+              if (response3M && response3M.error === 'AUTH_REQUIRED') {
+                showErrorPopup('AUTH_REQUIRED');
+                return;
+              }
               if (response3M && !response3M.error) {
                 cachedSpendingData = {
                   ...cachedSpendingData,
@@ -1539,11 +1598,14 @@ function refreshAll() {
       }
     });
   } else if (will3MLoad) {
-    // Only 3 months enabled
     safeSendMessage({ action: 'GET_SPENDING_3M', force: true }, response3M => {
       isLoading3M = false;
       if (response3M && response3M.error === 'TAB_CREATE_FAILED') {
         showErrorPopup('TAB_CREATE_FAILED');
+        return;
+      }
+      if (response3M && response3M.error === 'AUTH_REQUIRED') {
+        showErrorPopup('AUTH_REQUIRED');
         return;
       }
       if (response3M && !response3M.error) {
@@ -1668,7 +1730,7 @@ function loadData(showLoading = true) {
           });
         }
       } else if (response30 && response30.error === 'AUTH_REQUIRED') {
-        console.log('Tracker: Authentication required to fetch orders.');
+        showErrorPopup('AUTH_REQUIRED');
       }
     });
   } else if (need3Months) {
@@ -1695,7 +1757,7 @@ function loadData(showLoading = true) {
           injectPopup(cachedSpendingData);
         }
       } else if (response3M && response3M.error === 'AUTH_REQUIRED') {
-        console.log('Tracker: Authentication required to fetch orders.');
+        showErrorPopup('AUTH_REQUIRED');
       }
     });
   }
