@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/amazon-spending-tracker/ebpikpmmnpjmlcpanakfcgchkdjaanmm">
-    <img src="https://img.shields.io/chrome-web-store/v/ebpikpmmnpjmlcpanakfcgchkdjaanmm?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white&color=4285F4" alt="Chrome Web Store">
+  <a href="https://chromewebstore.google.com/detail/amazon-spending-tracker/jkdbmbhaikmkjkkjcppobcljbmofifbo">
+    <img src="https://img.shields.io/chrome-web-store/v/jkdbmbhaikmkjkkjcppobcljbmofifbo?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white&color=4285F4" alt="Chrome Web Store">
   </a>
-  <a href="https://chromewebstore.google.com/detail/amazon-spending-tracker/ebpikpmmnpjmlcpanakfcgchkdjaanmm">
-    <img src="https://img.shields.io/chrome-web-store/users/ebpikpmmnpjmlcpanakfcgchkdjaanmm?label=Users&logo=googlechrome&logoColor=white&color=34A853" alt="Chrome Web Store Users">
+  <a href="https://chromewebstore.google.com/detail/amazon-spending-tracker/jkdbmbhaikmkjkkjcppobcljbmofifbo">
+    <img src="https://img.shields.io/chrome-web-store/users/jkdbmbhaikmkjkkjcppobcljbmofifbo?label=Users&logo=googlechrome&logoColor=white&color=34A853" alt="Chrome Web Store Users">
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
@@ -131,7 +131,7 @@ The extension supports **21 Amazon regional domains** with localized price parsi
 
 ### From the Chrome Web Store
 
-1. Visit the [Chrome Web Store listing](https://chromewebstore.google.com/detail/amazon-spending-tracker/ebpikpmmnpjmlcpanakfcgchkdjaanmm)
+1. Visit the [Chrome Web Store listing](https://chromewebstore.google.com/detail/amazon-spending-tracker/jkdbmbhaikmkjkkjcppobcljbmofifbo)
 2. Click **"Add to Chrome"**
 3. Navigate to any Amazon page. The spending widget appears automatically
 
