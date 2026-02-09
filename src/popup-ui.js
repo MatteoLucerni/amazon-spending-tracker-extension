@@ -143,8 +143,8 @@ function showLoadingPopup() {
 
   popup.innerHTML = `
         ${SPINNER_STYLE}
-        <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
-            <span>SpendGuard</span>
+        <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; gap:12px; cursor:move;">
+            <span style="display:flex; align-items:center; gap:5px;"><img src="${chrome.runtime.getURL('assets/images/icons/amz_icon.png')}" style="width:14px; height:14px;">SpendGuard</span>
             <div style="display:flex; align-items:center; gap:4px;">
                 ${GEAR_ICON_SVG.replace('<svg ', '<svg id="amz-settings" ')}
                 ${CLOSE_ICON_SVG}
@@ -363,8 +363,8 @@ function injectPopup(data) {
 
   popup.innerHTML = `
         ${SPINNER_STYLE}
-        <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
-            <span>SpendGuard</span>
+        <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; gap:12px; cursor:move;">
+            <span style="display:flex; align-items:center; gap:5px;"><img src="${chrome.runtime.getURL('assets/images/icons/amz_icon.png')}" style="width:14px; height:14px;">SpendGuard</span>
             <div style="display:flex; align-items:center; gap:4px;">
                 ${REFRESH_ICON_HEADER_SVG}
                 ${GEAR_ICON_SVG.replace('<svg ', '<svg id="amz-settings" ')}
@@ -467,8 +467,8 @@ function showErrorPopup(errorType) {
   }
 
   popup.innerHTML = `
-    <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; cursor:move;">
-      <span>SpendGuard</span>
+    <div id="amz-drag-handle" style="font-size:13px; font-weight:700; background:#232f3e; color:#ffffff; padding:6px 8px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; gap:12px; cursor:move;">
+      <span style="display:flex; align-items:center; gap:5px;"><img src="${chrome.runtime.getURL('assets/images/icons/amz_icon.png')}" style="width:14px; height:14px;">SpendGuard</span>
       <div style="display:flex; align-items:center; gap:4px;">
         ${GEAR_ICON_SVG.replace('<svg ', '<svg id="amz-settings" ')}
         ${CLOSE_ICON_SVG}
