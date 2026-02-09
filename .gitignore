@@ -1,0 +1,18 @@
+# Build output
+dist/
+
+# Zip packages (safety net)
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
