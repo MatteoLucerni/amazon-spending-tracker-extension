@@ -173,6 +173,7 @@ async function scrapeSinglePage(filter, domain, domainConfig, startIndex = 0) {
                 return {
                   sum: pageSum,
                   orderCount: orderCount,
+                  hasNextPage: !!document.querySelector('.a-pagination .a-last a'),
                   isBlocked:
                     document.body.innerText.includes('captcha') ||
                     document.querySelector('form[action*="signin"]') !== null,
@@ -235,10 +236,7 @@ async function scrapeWithTab(filter, domain, domainConfig) {
     totalSum += result.sum;
     totalOrders += result.orderCount;
 
-    if (result.orderCount < 10) {
-      console.log(
-        `[SpendGuard] ${filter} - Found less than 10 orders, this is the last page.`,
-      );
+    if (!result.hasNextPage) {
       break;
     }
 
